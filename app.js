@@ -374,6 +374,7 @@ function isMuscleActive(selected, names) {
   const norm = String(selected).toLowerCase();
   return names.some(name => norm === String(name).toLowerCase());
 }
+
 function bodyMapSVG(selected = '') {
   const side = focusSide(selected);
   const transform = focusTransform(selected);
@@ -421,10 +422,47 @@ function bodyMapSVG(selected = '') {
   </g>`;
   return `<svg class="body-map ${side}" viewBox="0 0 200 320" aria-label="Mannequin musculaire détaillé">${side === 'back' ? back : front}</svg>`;
 }
-function exerciseSketch(ex) {
-  const target = dominantExerciseTarget(ex);
-  return bodyMapSVG(target).replace('class="body-map', 'class="body-map exercise-sketch');
+function armFocusSVG(selected = 'Biceps') {
+  const side = focusSide(selected);
+  const active = (...names) => isMuscleActive(selected, names) ? 'active-muscle' : '';
+  const front = `<svg class="body-map body-part-map arm-map" viewBox="0 0 170 260" aria-label="Bras"><path class="body-base" d="M88 22Q113 35 121 72L110 117Q119 136 115 163L101 238H61L51 161Q47 134 56 117L45 72Q53 35 78 22Z"/><path class="muscle ${active('Biceps','Bras')}" d="M60 68Q87 48 106 68L104 114Q87 125 62 112Z"/><path class="muscle ${active('Avant-bras','Bras')}" d="M57 133Q86 120 107 133L99 228H65Z"/></svg>`;
+  const back = `<svg class="body-map body-part-map arm-map" viewBox="0 0 170 260" aria-label="Bras"><path class="body-base" d="M88 22Q113 35 121 72L110 117Q119 136 115 163L101 238H61L51 161Q47 134 56 117L45 72Q53 35 78 22Z"/><path class="muscle ${active('Triceps','Bras')}" d="M58 64Q87 50 108 66L111 132Q85 147 55 129Z"/><path class="muscle ${active('Avant-bras','Bras')}" d="M57 133Q86 120 107 133L99 228H65Z"/></svg>`;
+  return side === 'back' ? back : front;
 }
+function legFocusSVG(selected = 'Quadriceps') {
+  const side = focusSide(selected);
+  const active = (...names) => isMuscleActive(selected, names) ? 'active-muscle' : '';
+  const front = `<svg class="body-map body-part-map leg-map" viewBox="0 0 170 300" aria-label="Jambe"><path class="body-base" d="M57 18H113L122 104Q120 131 114 160L108 286H80L72 160Q66 131 48 104Z"/><path class="muscle ${active('Quadriceps','Jambes')}" d="M61 56H109L108 170Q95 187 82 170L61 170Z"/><path class="muscle ${active('Mollets','Jambes')}" d="M74 184H100L103 281H71Z"/></svg>`;
+  const back = `<svg class="body-map body-part-map leg-map" viewBox="0 0 170 300" aria-label="Jambe"><path class="body-base" d="M57 18H113L122 104Q120 131 114 160L108 286H80L72 160Q66 131 48 104Z"/><path class="muscle ${active('Ischios','Jambes')}" d="M61 56H109L105 164Q91 176 79 164L61 164Z"/><path class="muscle ${active('Mollets','Jambes')}" d="M74 184H100L103 281H71Z"/></svg>`;
+  return side === 'back' ? back : front;
+}
+function torsoFrontSVG(selected = 'Pectoraux') {
+  const active = (...names) => isMuscleActive(selected, names) ? 'active-muscle' : '';
+  return `<svg class="body-map body-part-map torso-map" viewBox="0 0 230 260" aria-label="Torse"><circle cx="115" cy="25" r="18"/><path class="body-base" d="M84 48Q115 30 146 48L170 115Q160 153 153 210H77Q70 153 60 115Z"/><path class="body-limb" d="M84 54 54 118 70 126 93 84Z"/><path class="body-limb" d="M146 54 176 118 160 126 137 84Z"/><path class="muscle ${active('Pectoraux')}" d="M84 70Q115 56 146 70L136 107Q115 119 94 107Z"/><path class="muscle ${active('Épaules','Deltoïdes')}" d="M61 58Q73 46 86 52L80 87 59 84ZM144 52Q157 46 169 58L171 84 150 87Z"/><path class="muscle ${active('Core','Abdos')}" d="M98 111H132L136 172H94Z"/><path class="muscle ${active('Obliques','Core')}" d="M84 118 96 121 92 171 77 160ZM146 118 134 121 138 171 153 160Z"/></svg>`;
+}
+function torsoBackSVG(selected = 'Grand dorsal') {
+  const active = (...names) => isMuscleActive(selected, names) ? 'active-muscle' : '';
+  return `<svg class="body-map body-part-map torso-map" viewBox="0 0 230 260" aria-label="Dos"><circle cx="115" cy="25" r="18"/><path class="body-base" d="M84 48Q115 34 146 48L170 119Q159 161 151 210H79Q71 161 60 119Z"/><path class="body-limb" d="M84 54 54 118 70 126 93 84Z"/><path class="body-limb" d="M146 54 176 118 160 126 137 84Z"/><path class="muscle ${active('Trapèzes','Dos')}" d="M92 56Q115 45 138 56L141 82Q115 93 89 82Z"/><path class="muscle ${active('Grand dorsal','Dos')}" d="M84 74Q115 58 146 74L151 142Q115 162 79 142Z"/><path class="muscle ${active('Épaules','Deltoïdes')}" d="M61 58Q73 48 86 54L81 88 60 84ZM144 54Q157 48 169 58L170 84 149 88Z"/></svg>`;
+}
+function gluteFocusSVG(selected = 'Fessiers') {
+  const active = (...names) => isMuscleActive(selected, names) ? 'active-muscle' : '';
+  return `<svg class="body-map body-part-map glute-map" viewBox="0 0 220 250" aria-label="Hanches et fessiers"><path class="body-base" d="M82 30Q110 18 138 30L156 94Q148 126 143 217H77Q72 126 64 94Z"/><path class="muscle ${active('Fessiers')}" d="M82 88Q110 75 138 88L134 154Q110 166 86 154Z"/><path class="muscle ${active('Ischios','Jambes')}" d="M87 154H108L102 217H82ZM112 154H133L138 217H118Z"/></svg>`;
+}
+function focusVisualSVG(selected = '', preferredGroup = '') {
+  const family = preferredGroup || focusFamily(selected);
+  if (family === 'Bras') return armFocusSVG(selected || 'Biceps');
+  if (family === 'Jambes') return legFocusSVG(selected || 'Quadriceps');
+  if (family === 'Dos') return torsoBackSVG(selected || 'Grand dorsal');
+  if (family === 'Fessiers') return gluteFocusSVG(selected || 'Fessiers');
+  if (['Pectoraux', 'Épaules', 'Core'].includes(family)) return torsoFrontSVG(selected || family);
+  return bodyMapSVG(selected || 'Full body');
+}
+function exerciseSketch(ex, preferredGroup = '') {
+  const target = dominantExerciseTarget(ex);
+  const family = preferredGroup || focusFamily(target);
+  return focusVisualSVG(target, family).replace('class="body-map', 'class="body-map exercise-sketch');
+}
+
 function dominantExerciseTarget(ex) {
   const group = ex.group.toLowerCase();
   if (group.includes('biceps')) return 'Biceps';
@@ -487,7 +525,7 @@ function renderWorkoutWizard() {
     if (workoutWizard.type === 'fitness') {
       const detailOptions = fitnessDetailOptions(workoutWizard.focusMain);
       const currentFocus = workoutWizard.focus || workoutWizard.focusMain;
-      content.innerHTML = `${header}<p class="muted">Choisis d’abord un groupe musculaire, puis affine avec le muscle exact à cibler.</p><div class="muscle-selector muscle-selector-large"><div class="muscle-stage"><div class="muscle-stage-copy"><small>Visualisation</small><b>${focusLabel(currentFocus)}</b><span>${currentFocus ? 'Le mannequin zoome et met en évidence la zone choisie.' : 'Sélectionne un groupe à droite pour le voir en grand.'}</span></div><div id="wizard-body-map">${bodyMapSVG(currentFocus || 'Full body')}</div></div><div class="focus-panel"><div><small class="focus-label">Groupes musculaires</small><div class="focus-group-grid">${FITNESS_FOCUS_GROUPS.map(item => `<button type="button" class="focus-card ${workoutWizard.focusMain === item.id ? 'selected' : ''}" data-wizard-main="${item.id}"><b>${item.label}</b><span>${item.id === 'Bras' ? 'Biceps · triceps · avant-bras' : item.id === 'Jambes' ? 'Quadriceps · ischios · mollets' : item.id === 'Dos' ? 'Grand dorsal · trapèzes' : item.id === 'Core' ? 'Abdos · obliques' : item.id}</span></button>`).join('')}</div></div>${detailOptions.length ? `<div class="focus-detail-block"><small class="focus-label">Muscles précis</small><div class="focus-subgrid">${detailOptions.map(item => `<button type="button" class="muscle-chip ${workoutWizard.focus === item ? 'selected' : ''}" data-wizard-detail="${item}">${item}</button>`).join('')}</div></div>` : `<div class="focus-detail-block empty-focus"><small class="focus-label">Muscles précis</small><p>${workoutWizard.focusMain === 'Full body' ? 'Le mode full body utilisera des exercices globaux.' : 'Choisis un groupe pour afficher les muscles précis.'}</p></div>`}</div></div><div class="modal-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-next" ${(workoutWizard.focus || workoutWizard.focusMain) ? '' : 'disabled'}>Voir les exercices</button></div>`;
+      content.innerHTML = `${header}<p class="muted">Choisis d’abord un groupe musculaire, puis affine avec le muscle exact à cibler.</p><div class="muscle-selector muscle-selector-large"><div class="muscle-stage"><div class="muscle-stage-copy"><small>Visualisation</small><b>${focusLabel(currentFocus)}</b><span>${currentFocus ? 'Le mannequin zoome et met en évidence la zone choisie.' : 'Sélectionne un groupe à droite pour le voir en grand.'}</span></div><div id="wizard-body-map">${focusVisualSVG(currentFocus || workoutWizard.focusMain || 'Full body', workoutWizard.focusMain)}</div></div><div class="focus-panel"><div><small class="focus-label">Groupes musculaires</small><div class="focus-group-grid">${FITNESS_FOCUS_GROUPS.map(item => `<button type="button" class="focus-card ${workoutWizard.focusMain === item.id ? 'selected' : ''}" data-wizard-main="${item.id}"><b>${item.label}</b><span>${item.id === 'Bras' ? 'Biceps · triceps · avant-bras' : item.id === 'Jambes' ? 'Quadriceps · ischios · mollets' : item.id === 'Dos' ? 'Grand dorsal · trapèzes' : item.id === 'Core' ? 'Abdos · obliques' : item.id}</span></button>`).join('')}</div></div>${detailOptions.length ? `<div class="focus-detail-block"><small class="focus-label">Muscles précis</small><div class="focus-subgrid">${detailOptions.map(item => `<button type="button" class="muscle-chip ${workoutWizard.focus === item ? 'selected' : ''}" data-wizard-detail="${item}">${item}</button>`).join('')}</div></div>` : `<div class="focus-detail-block empty-focus"><small class="focus-label">Muscles précis</small><p>${workoutWizard.focusMain === 'Full body' ? 'Le mode full body utilisera des exercices globaux.' : 'Choisis un groupe pour afficher les muscles précis.'}</p></div>`}</div></div><div class="modal-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-next" ${(workoutWizard.focus || workoutWizard.focusMain) ? '' : 'disabled'}>Voir les exercices</button></div>`;
       content.querySelectorAll('[data-wizard-main]').forEach(btn => btn.onclick = () => {
         workoutWizard.focusMain = btn.dataset.wizardMain;
         const details = fitnessDetailOptions(workoutWizard.focusMain);
@@ -500,13 +538,13 @@ function renderWorkoutWizard() {
       return;
     }
     const focuses = workoutWizard.type === 'cardio' ? ['Endurance', 'HIIT', 'Vitesse', 'Puissance'] : ['Mobilité', 'Core', 'Full body'];
-    content.innerHTML = `${header}<p class="muted">Sélectionne la zone ou l’objectif principal.</p><div class="muscle-selector"><div id="wizard-body-map">${bodyMapSVG(workoutWizard.focus || 'Full body')}</div><div class="muscle-grid">${focuses.map(f => `<button type="button" class="${workoutWizard.focus === f ? 'selected' : ''}" data-wizard-focus="${f}">${f}</button>`).join('')}</div></div><div class="modal-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-next" ${workoutWizard.focus ? '' : 'disabled'}>Voir les exercices</button></div>`;
+    content.innerHTML = `${header}<p class="muted">Sélectionne la zone ou l’objectif principal.</p><div class="muscle-selector"><div id="wizard-body-map">${focusVisualSVG(workoutWizard.focus || 'Full body', focusFamily(workoutWizard.focus))}</div><div class="muscle-grid">${focuses.map(f => `<button type="button" class="${workoutWizard.focus === f ? 'selected' : ''}" data-wizard-focus="${f}">${f}</button>`).join('')}</div></div><div class="modal-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-next" ${workoutWizard.focus ? '' : 'disabled'}>Voir les exercices</button></div>`;
     content.querySelectorAll('[data-wizard-focus]').forEach(btn => btn.onclick = () => { workoutWizard.focus = btn.dataset.wizardFocus; renderWorkoutWizard(); });
     document.getElementById('wizard-back').onclick = () => { workoutWizard.step = 2; renderWorkoutWizard(); };
     document.getElementById('wizard-next').onclick = () => { workoutWizard.step = 4; renderWorkoutWizard(); }; return;
   }
   const available = wizardExercisePool();
-  content.innerHTML = `${header}<p class="muted">Appuie sur les exercices à ajouter. Tu pourras ensuite modifier les séries, répétitions et charges.</p><div class="wizard-exercises">${available.map(ex => `<button type="button" class="wizard-exercise ${workoutWizard.selected.includes(ex.id) ? 'selected' : ''}" data-wizard-exercise="${ex.id}"><span class="exercise-visual">${exerciseSketch(ex)}</span><span><b>${escapeHtml(ex.name)}</b><small>${escapeHtml(ex.group)} · ${escapeHtml(ex.equipment)}</small></span><i>${workoutWizard.selected.includes(ex.id) ? '✓' : '+'}</i></button>`).join('') || '<div class="empty">Aucun exercice ne correspond exactement. Choisis « Mixte » pour voir davantage d’options.</div>'}</div><div class="modal-actions sticky-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-use" ${workoutWizard.selected.length ? '' : 'disabled'}>Ajouter ${workoutWizard.selected.length || ''}</button></div>`;
+  content.innerHTML = `${header}<p class="muted">Appuie sur les exercices à ajouter. Tu pourras ensuite modifier les séries, répétitions et charges.</p><div class="wizard-exercises">${available.map(ex => `<button type="button" class="wizard-exercise ${workoutWizard.selected.includes(ex.id) ? 'selected' : ''}" data-wizard-exercise="${ex.id}"><span class="exercise-visual">${exerciseSketch(ex, workoutWizard.focusMain || focusFamily(workoutWizard.focus))}</span><span><b>${escapeHtml(ex.name)}</b><small>${escapeHtml(ex.group)} · ${escapeHtml(ex.equipment)}</small></span><i>${workoutWizard.selected.includes(ex.id) ? '✓' : '+'}</i></button>`).join('') || '<div class="empty">Aucun exercice ne correspond exactement. Choisis « Mixte » pour voir davantage d’options.</div>'}</div><div class="modal-actions sticky-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-use" ${workoutWizard.selected.length ? '' : 'disabled'}>Ajouter ${workoutWizard.selected.length || ''}</button></div>`;
   content.querySelectorAll('[data-wizard-exercise]').forEach(btn => btn.onclick = () => { const id = btn.dataset.wizardExercise; workoutWizard.selected = workoutWizard.selected.includes(id) ? workoutWizard.selected.filter(x => x !== id) : [...workoutWizard.selected, id]; renderWorkoutWizard(); });
   document.getElementById('wizard-back').onclick = () => { workoutWizard.step = 3; renderWorkoutWizard(); };
   document.getElementById('wizard-use').onclick = useWizardSelection;
