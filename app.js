@@ -17,587 +17,553 @@ const EXERCISES = [
   ['Étirement hanches', 'Mobilité', 'Aucun'], ['Mobilité épaules', 'Mobilité', 'Élastique'], ['Deep squat hold', 'Mobilité', 'Aucun']
 ].map((x, i) => ({ id: `ex-${i + 1}`, name: x[0], group: x[1], equipment: x[2] }));
 
-const DEFAULT_WORKOUTS = [
-  {
-    id: 'starter-fullbody', name: 'Full Body découverte', createdAt: Date.now(),
-    exercises: [
-      { exerciseId: 'ex-1', name: 'Squat', sets: 3, reps: 8, load: 0, rest: 90 },
-      { exerciseId: 'ex-11', name: 'Développé couché', sets: 3, reps: 8, load: 0, rest: 90 },
-      { exerciseId: 'ex-18', name: 'Rowing barre', sets: 3, reps: 10, load: 0, rest: 75 },
-      { exerciseId: 'ex-28', name: 'Planche', sets: 3, reps: 30, load: 0, rest: 45 }
-    ]
-  }
-];
+const DEFAULT_WORKOUTS = [{
+  id: 'starter-fullbody', name: 'Full Body découverte', createdAt: Date.now(),
+  exercises: [
+    { exerciseId: 'ex-1', name: 'Squat', sets: 3, reps: 8, load: 0, rest: 90 },
+    { exerciseId: 'ex-11', name: 'Développé couché', sets: 3, reps: 8, load: 0, rest: 90 },
+    { exerciseId: 'ex-18', name: 'Rowing barre', sets: 3, reps: 10, load: 0, rest: 75 },
+    { exerciseId: 'ex-28', name: 'Planche', sets: 3, reps: 30, load: 0, rest: 45 }
+  ]
+}];
 
-const TODAY = () => new Date().toISOString().slice(0, 10);
+const MEAL_TYPES = ['Petit-déjeuner', 'Collation matinale', 'Dîner', 'Collation après-midi', 'Souper'];
 const DB_KEY = 'ariseDataV1';
+const TODAY = () => localDateKey(new Date());
 let deferredInstallPrompt = null;
 let builder = [];
+let editingWorkoutId = null;
 let activeStream = null;
+let html5Scanner = null;
+let workoutWizard = null;
 
-const initialState = () => ({
-  version: 1,
-  workouts: DEFAULT_WORKOUTS,
-  sessions: [],
-  meals: [],
-  habits: [
-    { id: uid(), name: 'Boire 2 L d’eau', target: 'Tous les jours', checks: {} },
-    { id: uid(), name: '10 minutes de mobilité', target: 'Tous les jours', checks: {} }
-  ],
-  radar: { Force: 55, Puissance: 45, Vitesse: 50, Endurance: 60, Mobilité: 40, Régularité: 55 }
-});
-
-let state = loadState();
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (!raw) return initialState();
-    const parsed = JSON.parse(raw);
-    return { ...initialState(), ...parsed };
-  } catch {
-    return initialState();
-  }
-}
-function saveState() {
-  localStorage.setItem(DB_KEY, JSON.stringify(state));
-}
 function uid() {
-  return (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return (globalThis.crypto?.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
+function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function localDateKey(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function sessionDateKey(session) { return session.dateKey || localDateKey(session.date); }
+function clamp(value, min = 0, max = 100) { return Math.max(min, Math.min(max, Number(value) || 0)); }
+function initialState() {
+  return {
+    version: 2,
+    goals: { calories: 2400, protein: 160, sleep: 8 },
+    workouts: clone(DEFAULT_WORKOUTS), sessions: [], meals: [], recoveryLogs: {},
+    habits: [
+      { id: uid(), name: 'Boire 2 L d’eau', target: 'Tous les jours', checks: {} },
+      { id: uid(), name: '10 minutes de mobilité', target: 'Tous les jours', checks: {} }
+    ],
+    radar: { Force: 55, Puissance: 45, Vitesse: 50, Endurance: 60, Mobilité: 40, Régularité: 55 }
+  };
+}
+function normalizeState(parsed) {
+  const base = initialState();
+  const source = parsed && typeof parsed === 'object' ? parsed : {};
+  return {
+    ...base, ...source, version: 2,
+    goals: { ...base.goals, ...(source.goals || {}) },
+    radar: { ...base.radar, ...(source.radar || {}) },
+    recoveryLogs: source.recoveryLogs || {},
+    workouts: Array.isArray(source.workouts) ? source.workouts : base.workouts,
+    sessions: Array.isArray(source.sessions) ? source.sessions : [],
+    meals: Array.isArray(source.meals) ? source.meals : [],
+    habits: Array.isArray(source.habits) ? source.habits : base.habits
+  };
+}
+function loadState() {
+  try { return normalizeState(JSON.parse(localStorage.getItem(DB_KEY) || 'null')); }
+  catch { return initialState(); }
+}
+let state = loadState();
+function saveState() { localStorage.setItem(DB_KEY, JSON.stringify(state)); }
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-}
-function toast(message) {
-  document.querySelector('.toast')?.remove();
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.textContent = message;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2300);
-}
-function modal(html) {
-  const dlg = document.getElementById('modal');
-  stopCamera();
-  document.getElementById('modal-content').innerHTML = html;
-  dlg.showModal();
-}
-function closeModal() {
-  stopCamera();
-  document.getElementById('modal').close();
 }
 function formatNumber(value, digits = 0) {
   return new Intl.NumberFormat('fr-CH', { maximumFractionDigits: digits }).format(Number(value) || 0);
 }
+function toast(message) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div'); el.className = 'toast'; el.textContent = message;
+  document.body.appendChild(el); setTimeout(() => el.remove(), 2300);
+}
+function modal(html, extraClass = '') {
+  const dlg = document.getElementById('modal');
+  stopCamera();
+  const content = document.getElementById('modal-content');
+  content.className = `modal-card ${extraClass}`.trim();
+  content.innerHTML = html;
+  if (!dlg.open) dlg.showModal();
+}
+function closeModal() {
+  stopCamera();
+  const dlg = document.getElementById('modal');
+  if (dlg.open) dlg.close();
+}
+function confirmDelete(title, message, onConfirm) {
+  modal(`<div class="confirm-icon"><svg><use href="#i-trash"/></svg></div><h2>${escapeHtml(title)}</h2><p class="muted">${escapeHtml(message)}</p><div class="modal-actions"><button type="button" class="secondary" id="cancel-confirm">Annuler</button><button type="button" class="danger-button" id="confirm-delete">Supprimer</button></div>`);
+  document.getElementById('cancel-confirm').onclick = closeModal;
+  document.getElementById('confirm-delete').onclick = () => { closeModal(); onConfirm(); };
+}
 
 function showView(viewId, smooth = true) {
-  const target = document.getElementById(viewId);
-  if (!target) return;
+  const target = document.getElementById(viewId); if (!target) return;
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === viewId));
   document.querySelectorAll('.nav-item').forEach(x => x.classList.toggle('active', x.dataset.view === viewId));
-  const kicker = document.getElementById('page-kicker');
-  if (kicker) kicker.textContent = target.dataset.kicker || target.dataset.title || 'ARISE';
+  document.getElementById('page-kicker').textContent = target.dataset.kicker || target.dataset.title || 'ARISE';
   window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
   if (viewId === 'tracking-view') requestAnimationFrame(drawAllCharts);
 }
-
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.go)));
-  document.getElementById('brand-home')?.addEventListener('click', () => showView('home-view'));
-  document.getElementById('open-settings')?.addEventListener('click', () => showView('settings-view'));
+  document.getElementById('brand-home').onclick = () => showView('home-view');
+  document.getElementById('open-settings').onclick = () => showView('settings-view');
 }
 
+function mealsFor(dateKey = TODAY()) { return state.meals.filter(m => (m.date || TODAY()) === dateKey); }
+function sessionsFor(dateKey = TODAY()) { return state.sessions.filter(s => sessionDateKey(s) === dateKey); }
+function nutritionTotals(dateKey = TODAY()) {
+  return mealsFor(dateKey).reduce((a, m) => ({
+    kcal: a.kcal + Number(m.kcal || 0), protein: a.protein + Number(m.protein || 0), carbs: a.carbs + Number(m.carbs || 0),
+    fat: a.fat + Number(m.fat || 0), fiber: a.fiber + Number(m.fiber || 0), qualityWeighted: a.qualityWeighted + Number(m.qualityScore ?? 60) * Math.max(1, Number(m.kcal || 0)), weight: a.weight + Math.max(1, Number(m.kcal || 0))
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, qualityWeighted: 0, weight: 0 });
+}
+function targetProgress(value, target) {
+  if (!value || !target) return 0;
+  if (value <= target) return clamp(value / target * 100);
+  return clamp(100 - ((value - target) / target * 80));
+}
+function dailyScore(dateKey = TODAY()) {
+  const sessions = sessionsFor(dateKey);
+  const meals = mealsFor(dateKey);
+  const totals = nutritionTotals(dateKey);
+  const recovery = state.recoveryLogs[dateKey];
+  const habitsDone = state.habits.filter(h => h.checks?.[dateKey]).length;
+  const volume = sessions.reduce((sum, s) => sum + Number(s.volume || 0), 0);
+  const training = sessions.length ? clamp(78 + Math.min(22, sessions.length * 7 + volume / 2500)) : 0;
+  const quality = totals.weight ? totals.qualityWeighted / totals.weight : 0;
+  const nutrition = meals.length ? Math.round(targetProgress(totals.kcal, state.goals.calories) * .45 + targetProgress(totals.protein, state.goals.protein) * .35 + quality * .20) : 0;
+  const recoveryScore = recovery ? Math.round(clamp(recovery.sleepHours / state.goals.sleep * 100) * .55 + clamp(recovery.quality / 5 * 100) * .30 + clamp(recovery.energy / 5 * 100) * .15) : 0;
+  const habits = state.habits.length ? Math.round(habitsDone / state.habits.length * 100) : 0;
+  const total = Math.round(training * .30 + nutrition * .30 + recoveryScore * .25 + habits * .15);
+  return { total, training: Math.round(training), nutrition, recovery: recoveryScore, habits, totals, sessions: sessions.length, habitsDone, habitTotal: state.habits.length };
+}
+function scoreLabel(score) {
+  if (score === 0) return 'Commence ta journée';
+  if (score < 35) return 'En construction';
+  if (score < 60) return 'Bien lancé';
+  if (score < 80) return 'Très bon rythme';
+  return 'Excellent';
+}
 function renderHome() {
-  const now = new Date();
-  const today = TODAY();
-  const recentSessions = sessionsInLastDays(7);
-  const mealsToday = state.meals.filter(m => m.date === today);
-  const calories = mealsToday.reduce((sum, m) => sum + Number(m.kcal || 0), 0);
-  const habitsDone = state.habits.filter(h => h.checks[today]).length;
-  const habitTotal = state.habits.length;
-  const regularity = Math.min(100, Math.round(recentSessions.length / 4 * 100));
-  const nutritionScore = Math.min(100, Math.round(calories / 2400 * 100));
-  const habitScore = habitTotal ? Math.round(habitsDone / habitTotal * 100) : 0;
-  const score = Math.max(12, Math.min(100, Math.round(55 + regularity * .2 + nutritionScore * .12 + habitScore * .13)));
-
-  const dayEl = document.getElementById('home-day');
-  const dateEl = document.getElementById('home-date');
-  if (dayEl) dayEl.textContent = now.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '').toUpperCase();
-  if (dateEl) dateEl.textContent = String(now.getDate()).padStart(2, '0');
-  document.getElementById('home-score').textContent = score;
-  document.getElementById('home-energy').textContent = `${Math.min(99, 72 + recentSessions.length * 5)}%`;
-  document.getElementById('home-recovery').textContent = `${Math.max(60, 86 - Math.max(0, recentSessions.length - 3) * 6)}%`;
-  document.getElementById('home-motivation').textContent = `${Math.min(99, 78 + habitScore * .18).toFixed(0)}%`;
+  const now = new Date(); const data = dailyScore();
+  document.getElementById('home-day').textContent = now.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '').toUpperCase();
+  document.getElementById('home-date').textContent = String(now.getDate()).padStart(2, '0');
+  document.getElementById('home-score').textContent = data.total;
+  document.getElementById('home-energy').textContent = `${data.training}%`;
+  document.getElementById('home-recovery').textContent = `${data.recovery}%`;
+  document.getElementById('home-motivation').textContent = `${data.nutrition}%`;
+  document.getElementById('score-status').innerHTML = `<i></i> ${scoreLabel(data.total)}`;
   const ring = document.getElementById('score-ring');
-  if (ring) ring.style.background = `conic-gradient(var(--cyan) 0 ${score * .38}%, var(--blue) ${score * .38}% ${score * .72}%, var(--violet) ${score * .72}% ${score}%, rgba(255,255,255,.06) ${score}% 100%)`;
-
-  const workoutProgress = Math.min(100, recentSessions.length * 100);
-  const kcalProgress = Math.min(100, calories / 2400 * 100);
-  const habitsProgress = habitTotal ? habitsDone / habitTotal * 100 : 0;
+  ring.style.background = data.total ? `conic-gradient(var(--cyan) 0 ${data.total * .38}%, var(--blue) ${data.total * .38}% ${data.total * .72}%, var(--violet) ${data.total * .72}% ${data.total}%, rgba(255,255,255,.06) ${data.total}% 100%)` : 'conic-gradient(rgba(255,255,255,.06) 0 100%)';
+  const kcalProgress = clamp(data.totals.kcal / state.goals.calories * 100);
+  const workoutProgress = data.sessions ? 100 : 0;
+  const habitProgress = data.habitTotal ? data.habitsDone / data.habitTotal * 100 : 0;
   document.getElementById('home-summary').innerHTML = `
-    <article class="summary-tile orange-tile"><span>⌁</span><small>Calories</small><b>${formatNumber(calories)}</b><p>/ 2 400 kcal</p><i><em style="width:${kcalProgress}%"></em></i></article>
-    <article class="summary-tile blue-tile"><span>✦</span><small>Entraînements</small><b>${recentSessions.length}</b><p>/ 1 session</p><i><em style="width:${workoutProgress}%"></em></i></article>
-    <article class="summary-tile purple-tile"><span>✓</span><small>Habitudes</small><b>${habitsDone}</b><p>/ ${habitTotal} terminées</p><i><em style="width:${habitsProgress}%"></em></i></article>`;
+    <article class="summary-tile orange-tile"><span>⌁</span><small>Calories</small><b>${formatNumber(data.totals.kcal)}</b><p>/ ${formatNumber(state.goals.calories)} kcal</p><i><em style="width:${kcalProgress}%"></em></i></article>
+    <article class="summary-tile blue-tile"><span>✦</span><small>Entraînements</small><b>${data.sessions}</b><p>/ 1 session</p><i><em style="width:${workoutProgress}%"></em></i></article>
+    <article class="summary-tile purple-tile"><span>✓</span><small>Habitudes</small><b>${data.habitsDone}</b><p>/ ${data.habitTotal} terminées</p><i><em style="width:${habitProgress}%"></em></i></article>`;
 }
-
-function renderTraining() {
-  const totalVolume = state.sessions.reduce((sum, s) => sum + (s.volume || 0), 0);
-  const thisWeek = sessionsInLastDays(7).length;
-  const best = Math.max(0, ...state.sessions.map(s => s.volume || 0));
-  document.getElementById('training-stats').innerHTML = [
-    [thisWeek, 'séances / 7 j'], [`${formatNumber(totalVolume / 1000, 1)} t`, 'volume total'], [`${formatNumber(best)} kg`, 'meilleure séance']
-  ].map(([v, l]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
-
-  renderExerciseResults(document.getElementById('exercise-search').value);
-  renderBuilder();
-  const workoutCount = document.getElementById('workout-count');
-  if (workoutCount) workoutCount.textContent = state.workouts.length;
-  document.getElementById('saved-workouts').innerHTML = state.workouts.length ? state.workouts.map(w => `
-    <article class="workout-card">
-      <header><div><b>${escapeHtml(w.name)}</b><br><small>${w.exercises.length} exercices · ${w.exercises.reduce((a,e)=>a+Number(e.sets||0),0)} séries</small></div><span>🏋️</span></header>
-      <div class="card-actions">
-        <button class="secondary" data-edit-workout="${w.id}">Modifier</button>
-        <button class="primary" data-start-workout="${w.id}">Démarrer</button>
-      </div>
-    </article>`).join('') : '<div class="empty">Aucun workout enregistré.</div>';
-
-  document.querySelectorAll('[data-start-workout]').forEach(b => b.onclick = () => openSession(b.dataset.startWorkout));
-  document.querySelectorAll('[data-edit-workout]').forEach(b => b.onclick = () => editWorkout(b.dataset.editWorkout));
+function openScoreDetails() {
+  const s = dailyScore();
+  modal(`<h2>Ton Score Arise</h2><p class="muted">Le score repart de zéro chaque jour et augmente uniquement avec ce que tu enregistres.</p>
+    <div class="score-breakdown">
+      ${[['Entraînement', s.training, '30%'], ['Nutrition', s.nutrition, '30%'], ['Repos', s.recovery, '25%'], ['Habitudes', s.habits, '15%']].map(([name, value, weight]) => `<div><span><b>${name}</b><small>Poids ${weight}</small></span><strong>${value}%</strong><i><em style="width:${value}%"></em></i></div>`).join('')}
+    </div><button type="button" class="primary full" id="close-score">Compris</button>`);
+  document.getElementById('close-score').onclick = closeModal;
 }
 
 function sessionsInLastDays(days) {
   const since = Date.now() - days * 86400000;
   return state.sessions.filter(s => new Date(s.date).getTime() >= since);
 }
-
+function renderTraining() {
+  const totalVolume = state.sessions.reduce((sum, s) => sum + Number(s.volume || 0), 0);
+  const thisWeek = sessionsInLastDays(7).length;
+  const best = Math.max(0, ...state.sessions.map(s => Number(s.volume || 0)));
+  document.getElementById('training-stats').innerHTML = [[thisWeek, 'séances / 7 j'], [`${formatNumber(totalVolume / 1000, 1)} t`, 'volume total'], [`${formatNumber(best)} kg`, 'meilleure séance']].map(([v, l]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
+  renderExerciseResults(document.getElementById('exercise-search').value);
+  renderBuilder();
+  document.getElementById('workout-count').textContent = state.workouts.length;
+  const root = document.getElementById('saved-workouts');
+  root.innerHTML = state.workouts.length ? state.workouts.map(w => `<article class="workout-card">
+    <header><div><b>${escapeHtml(w.name)}</b><br><small>${w.exercises.length} exercices · ${w.exercises.reduce((a, e) => a + Number(e.sets || 0), 0)} séries</small></div><span class="workout-icon"><svg><use href="#i-dumbbell"/></svg></span></header>
+    <div class="card-actions three-actions"><button class="icon-action" aria-label="Modifier" data-edit-workout="${w.id}"><svg><use href="#i-edit"/></svg></button><button class="icon-action danger-icon" aria-label="Supprimer" data-delete-workout="${w.id}"><svg><use href="#i-trash"/></svg></button><button class="primary" data-start-workout="${w.id}">Démarrer</button></div>
+  </article>`).join('') : '<div class="empty">Aucun workout enregistré.</div>';
+  root.querySelectorAll('[data-start-workout]').forEach(b => b.onclick = () => openSession(b.dataset.startWorkout));
+  root.querySelectorAll('[data-edit-workout]').forEach(b => b.onclick = () => editWorkout(b.dataset.editWorkout));
+  root.querySelectorAll('[data-delete-workout]').forEach(b => b.onclick = () => deleteWorkout(b.dataset.deleteWorkout));
+  renderSessionHistory();
+}
+function renderSessionHistory() {
+  const root = document.getElementById('session-history');
+  const sessions = state.sessions.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 12);
+  root.innerHTML = sessions.length ? sessions.map(s => `<article class="history-card"><div class="history-main"><span class="history-icon"><svg><use href="#i-dumbbell"/></svg></span><div><b>${escapeHtml(s.workoutName || 'Séance')}</b><small>${new Date(s.date).toLocaleDateString('fr-CH', { day: '2-digit', month: 'short' })} · ${formatNumber(s.volume)} kg</small></div></div><button class="icon-action danger-icon" data-delete-session="${s.id}" aria-label="Supprimer"><svg><use href="#i-trash"/></svg></button></article>`).join('') : '<div class="empty">Aucune séance enregistrée.</div>';
+  root.querySelectorAll('[data-delete-session]').forEach(btn => btn.onclick = () => {
+    const session = state.sessions.find(s => s.id === btn.dataset.deleteSession);
+    confirmDelete('Supprimer cette séance ?', `${session?.workoutName || 'Cette séance'} sera retirée de tes statistiques.`, () => {
+      state.sessions = state.sessions.filter(s => s.id !== btn.dataset.deleteSession); saveState(); renderAll(); toast('Séance supprimée');
+    });
+  });
+}
 function renderExerciseResults(query = '') {
   const q = query.trim().toLowerCase();
   const filtered = EXERCISES.filter(e => !q || `${e.name} ${e.group} ${e.equipment}`.toLowerCase().includes(q)).slice(0, 12);
-  document.getElementById('exercise-results').innerHTML = filtered.map(e => `
-    <div class="exercise-result">
-      <div><b>${e.name}</b><br><small>${e.group} · ${e.equipment}</small></div>
-      <button type="button" data-add-exercise="${e.id}">＋</button>
-    </div>`).join('');
-  document.querySelectorAll('[data-add-exercise]').forEach(btn => btn.onclick = () => {
+  const root = document.getElementById('exercise-results');
+  root.innerHTML = filtered.map(e => `<div class="exercise-result"><span class="exercise-mini">${exerciseSketch(e)}</span><div><b>${escapeHtml(e.name)}</b><br><small>${escapeHtml(e.group)} · ${escapeHtml(e.equipment)}</small></div><button type="button" data-add-exercise="${e.id}">＋</button></div>`).join('');
+  root.querySelectorAll('[data-add-exercise]').forEach(btn => btn.onclick = () => {
     const ex = EXERCISES.find(e => e.id === btn.dataset.addExercise);
-    builder.push({ exerciseId: ex.id, name: ex.name, sets: 3, reps: 10, load: 0, rest: 60 });
-    renderBuilder();
+    builder.push(defaultBuilderExercise(ex)); renderBuilder();
   });
 }
-
+function defaultBuilderExercise(ex, type = 'fitness') {
+  if (type === 'cardio') return { exerciseId: ex.id, name: ex.name, sets: 1, reps: 20, load: 0, rest: 60 };
+  if (type === 'mobilite') return { exerciseId: ex.id, name: ex.name, sets: 2, reps: 30, load: 0, rest: 30 };
+  return { exerciseId: ex.id, name: ex.name, sets: 3, reps: 10, load: 0, rest: 60 };
+}
 function renderBuilder() {
   const root = document.getElementById('workout-builder');
-  root.innerHTML = builder.length ? builder.map((e, i) => `
-    <div class="builder-item" data-builder-index="${i}">
-      <div class="builder-top"><b>${escapeHtml(e.name)}</b><button type="button" class="remove-btn" data-remove-builder="${i}">×</button></div>
-      <div class="fields">
-        <input aria-label="Séries" title="Séries" type="number" min="1" value="${e.sets}" data-field="sets" placeholder="Séries">
-        <input aria-label="Répétitions" title="Répétitions" type="number" min="1" value="${e.reps}" data-field="reps" placeholder="Rép.">
-        <input aria-label="Charge" title="Charge en kg" type="number" min="0" step="0.5" value="${e.load}" data-field="load" placeholder="kg">
-        <input aria-label="Repos" title="Repos en secondes" type="number" min="0" value="${e.rest}" data-field="rest" placeholder="Repos">
-      </div>
-    </div>`).join('') : '<div class="empty">Ajoute des exercices depuis la liste.</div>';
+  root.innerHTML = builder.length ? builder.map((e, i) => `<div class="builder-item" data-builder-index="${i}"><div class="builder-top"><div><b>${escapeHtml(e.name)}</b><small>${escapeHtml(EXERCISES.find(x => x.id === e.exerciseId)?.group || '')}</small></div><button type="button" class="remove-btn" data-remove-builder="${i}">×</button></div><div class="fields"><label>Séries<input type="number" min="1" value="${e.sets}" data-field="sets"></label><label>Rép./temps<input type="number" min="1" value="${e.reps}" data-field="reps"></label><label>Charge kg<input type="number" min="0" step="0.5" value="${e.load}" data-field="load"></label><label>Repos sec<input type="number" min="0" value="${e.rest}" data-field="rest"></label></div></div>`).join('') : '<div class="empty">Ajoute des exercices avec la création guidée ou la recherche.</div>';
   root.querySelectorAll('input').forEach(input => input.onchange = () => {
-    const i = Number(input.closest('[data-builder-index]').dataset.builderIndex);
-    builder[i][input.dataset.field] = Number(input.value);
+    const i = Number(input.closest('[data-builder-index]').dataset.builderIndex); builder[i][input.dataset.field] = Number(input.value);
   });
   root.querySelectorAll('[data-remove-builder]').forEach(btn => btn.onclick = () => {
-    builder.splice(Number(btn.dataset.removeBuilder), 1);
-    renderBuilder();
+    const i = Number(btn.dataset.removeBuilder);
+    confirmDelete('Retirer cet exercice ?', `${builder[i].name} sera retiré du workout en cours.`, () => { builder.splice(i, 1); renderBuilder(); });
   });
+  const saveButton = document.getElementById('save-workout');
+  saveButton.textContent = editingWorkoutId ? 'Mettre à jour le workout' : 'Enregistrer le workout';
 }
-
+function clearBuilder(force = false) {
+  const perform = () => { builder = []; editingWorkoutId = null; document.getElementById('workout-name').value = ''; renderBuilder(); };
+  if (!force && (builder.length || editingWorkoutId)) confirmDelete('Réinitialiser la création ?', 'Les modifications non enregistrées seront perdues.', perform); else perform();
+}
 function saveWorkout() {
   const name = document.getElementById('workout-name').value.trim();
   if (!name || !builder.length) return toast('Ajoute un nom et au moins un exercice');
-  state.workouts.push({ id: uid(), name, exercises: structuredClone(builder), createdAt: Date.now() });
-  saveState();
-  builder = [];
-  document.getElementById('workout-name').value = '';
-  renderTraining();
-  toast('Workout enregistré');
+  if (editingWorkoutId) {
+    const w = state.workouts.find(x => x.id === editingWorkoutId); if (!w) return;
+    w.name = name; w.exercises = clone(builder); w.updatedAt = Date.now(); toast('Workout mis à jour');
+  } else {
+    state.workouts.push({ id: uid(), name, exercises: clone(builder), createdAt: Date.now() }); toast('Workout enregistré');
+  }
+  saveState(); clearBuilder(true); renderTraining();
 }
-
 function editWorkout(id) {
-  const w = state.workouts.find(x => x.id === id);
-  if (!w) return;
-  builder = structuredClone(w.exercises);
-  document.getElementById('workout-name').value = `${w.name} — copie`;
-  renderBuilder();
-  window.scrollTo({ top: 650, behavior: 'smooth' });
-  toast('Workout chargé dans l’éditeur');
+  const w = state.workouts.find(x => x.id === id); if (!w) return;
+  editingWorkoutId = id; builder = clone(w.exercises); document.getElementById('workout-name').value = w.name; renderBuilder();
+  document.querySelector('.builder-card').scrollIntoView({ behavior: 'smooth', block: 'start' }); toast('Workout ouvert dans l’éditeur');
 }
-
+function deleteWorkout(id) {
+  const w = state.workouts.find(x => x.id === id); if (!w) return;
+  confirmDelete('Supprimer ce workout ?', `${w.name} sera supprimé. Les anciennes performances resteront dans l’historique.`, () => {
+    state.workouts = state.workouts.filter(x => x.id !== id); if (editingWorkoutId === id) clearBuilder(true); saveState(); renderTraining(); toast('Workout supprimé');
+  });
+}
 function recommendWorkout() {
-  const goal = document.getElementById('goal-filter').value;
-  const duration = Number(document.getElementById('duration-filter').value);
-  const pools = {
-    force: ['Squat','Développé couché','Soulevé de terre','Développé militaire','Tractions'],
-    hypertrophie: ['Presse à cuisses','Développé incliné','Tirage vertical','Élévations latérales','Curl biceps','Extension triceps'],
-    endurance: ['Course','Rameur','Burpees','Mountain climbers','Corde à sauter'],
-    mobilite: ['Étirement hanches','Mobilité épaules','Deep squat hold','Planche']
-  };
+  const goal = document.getElementById('goal-filter').value; const duration = Number(document.getElementById('duration-filter').value);
+  const pools = { force: ['Squat', 'Développé couché', 'Soulevé de terre', 'Développé militaire', 'Tractions'], hypertrophie: ['Presse à cuisses', 'Développé incliné', 'Tirage vertical', 'Élévations latérales', 'Curl biceps', 'Extension triceps'], endurance: ['Course', 'Rameur', 'Burpees', 'Mountain climbers', 'Corde à sauter'], mobilite: ['Étirement hanches', 'Mobilité épaules', 'Deep squat hold', 'Planche'] };
   const count = duration <= 20 ? 4 : duration <= 35 ? 5 : duration <= 50 ? 6 : 7;
-  const names = pools[goal].slice(0, count);
-  const recommendation = names.map(name => {
+  const recommendation = pools[goal].slice(0, count).map(name => {
     const ex = EXERCISES.find(x => x.name === name);
     return { exerciseId: ex.id, name, sets: goal === 'force' ? 4 : 3, reps: goal === 'force' ? 5 : goal === 'mobilite' ? 30 : 10, load: 0, rest: goal === 'force' ? 120 : 60 };
   });
   const root = document.getElementById('recommended-workout');
-  root.innerHTML = `<p><b>${goal[0].toUpperCase()+goal.slice(1)} · ${duration} min</b></p>${recommendation.map(x => `<div class="mini-row">${x.name} — ${x.sets} × ${x.reps}</div>`).join('')}<button class="secondary full" id="use-recommendation">Utiliser ce workout</button>`;
-  document.getElementById('use-recommendation').onclick = () => {
-    builder = recommendation;
-    document.getElementById('workout-name').value = `${goal[0].toUpperCase()+goal.slice(1)} ${duration}`;
-    renderBuilder();
-    toast('Workout ajouté à l’éditeur');
-  };
+  root.innerHTML = `<p><b>${goal[0].toUpperCase() + goal.slice(1)} · ${duration} min</b></p>${recommendation.map(x => `<div class="mini-row">${x.name} — ${x.sets} × ${x.reps}</div>`).join('')}<button class="secondary full" id="use-recommendation">Utiliser ce workout</button>`;
+  document.getElementById('use-recommendation').onclick = () => { editingWorkoutId = null; builder = recommendation; document.getElementById('workout-name').value = `${goal[0].toUpperCase() + goal.slice(1)} ${duration}`; renderBuilder(); toast('Workout ajouté à l’éditeur'); };
 }
-
 function openSession(workoutId) {
-  const w = state.workouts.find(x => x.id === workoutId);
-  if (!w) return;
-  modal(`
-    <h2>${escapeHtml(w.name)}</h2>
-    <p class="muted">Entre la charge et les répétitions réellement réalisées.</p>
-    <input type="hidden" id="session-workout-id" value="${w.id}">
-    <div class="stack">${w.exercises.map((e, i) => `
-      <div class="builder-item" data-session-row="${i}">
-        <b>${escapeHtml(e.name)}</b><small class="muted"> · ${e.sets} séries prévues</small>
-        <div class="fields">
-          <input type="number" data-sfield="sets" value="${e.sets}" min="1" title="Séries">
-          <input type="number" data-sfield="reps" value="${e.reps}" min="1" title="Répétitions">
-          <input type="number" data-sfield="load" value="${e.load}" min="0" step="0.5" title="Charge kg">
-          <input type="number" data-sfield="rpe" value="7" min="1" max="10" title="Difficulté RPE">
-        </div>
-      </div>`).join('')}</div>
-    <label>Commentaire<input id="session-note" placeholder="Énergie, douleur, technique…"></label>
-    <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="finish-session">Terminer</button></div>`);
-  document.getElementById('cancel-modal').onclick = closeModal;
-  document.getElementById('finish-session').onclick = () => finishSession(w);
+  const w = state.workouts.find(x => x.id === workoutId); if (!w) return;
+  modal(`<h2>${escapeHtml(w.name)}</h2><p class="muted">Entre la charge et les répétitions réellement réalisées.</p><div class="stack">${w.exercises.map((e, i) => `<div class="builder-item" data-session-row="${i}"><b>${escapeHtml(e.name)}</b><small class="muted"> · ${e.sets} séries prévues</small><div class="fields"><label>Séries<input type="number" data-sfield="sets" value="${e.sets}" min="1"></label><label>Rép./temps<input type="number" data-sfield="reps" value="${e.reps}" min="1"></label><label>Charge kg<input type="number" data-sfield="load" value="${e.load}" min="0" step="0.5"></label><label>RPE<input type="number" data-sfield="rpe" value="7" min="1" max="10"></label></div></div>`).join('')}</div><label>Commentaire<input id="session-note" placeholder="Énergie, douleur, technique…"></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="finish-session">Terminer</button></div>`);
+  document.getElementById('cancel-modal').onclick = closeModal; document.getElementById('finish-session').onclick = () => finishSession(w);
+}
+function finishSession(workout) {
+  const rows = [...document.querySelectorAll('[data-session-row]')].map((row, i) => { const data = {}; row.querySelectorAll('[data-sfield]').forEach(inp => data[inp.dataset.sfield] = Number(inp.value)); return { name: workout.exercises[i].name, ...data }; });
+  const volume = rows.reduce((sum, e) => sum + e.sets * e.reps * e.load, 0);
+  state.sessions.push({ id: uid(), workoutId: workout.id, workoutName: workout.name, date: new Date().toISOString(), dateKey: TODAY(), rows, volume, note: document.getElementById('session-note').value.trim() });
+  state.radar.Régularité = clamp(Math.round(sessionsInLastDays(28).length / 12 * 100)); saveState(); closeModal(); renderAll(); toast(`Séance enregistrée · ${formatNumber(volume)} kg`);
 }
 
-function finishSession(workout) {
-  const rows = [...document.querySelectorAll('[data-session-row]')].map((row, i) => {
-    const data = {};
-    row.querySelectorAll('[data-sfield]').forEach(inp => data[inp.dataset.sfield] = Number(inp.value));
-    return { name: workout.exercises[i].name, ...data };
-  });
-  const volume = rows.reduce((sum, e) => sum + e.sets * e.reps * e.load, 0);
-  state.sessions.push({ id: uid(), workoutId: workout.id, workoutName: workout.name, date: new Date().toISOString(), rows, volume, note: document.getElementById('session-note').value.trim() });
-  state.radar.Régularité = Math.min(100, Math.round(sessionsInLastDays(28).length / 12 * 100));
-  saveState();
-  closeModal();
-  renderAll();
-  toast(`Séance enregistrée · ${formatNumber(volume)} kg`);
+function groupFamily(group) {
+  const g = group.toLowerCase();
+  if (g.includes('pector')) return 'Pectoraux'; if (g.includes('dos')) return 'Dos'; if (g.includes('épaule')) return 'Épaules';
+  if (g.includes('biceps') || g.includes('triceps')) return 'Bras'; if (g.includes('jamb') || g.includes('quad') || g.includes('ischio') || g.includes('mollet')) return 'Jambes';
+  if (g.includes('fess')) return 'Fessiers'; if (g.includes('core')) return 'Core'; if (g.includes('mobil')) return 'Mobilité';
+  if (g.includes('cardio') || g.includes('endurance') || g.includes('puissance') || g.includes('vitesse')) return 'Cardio'; return 'Autre';
+}
+function exerciseType(ex) { const f = groupFamily(ex.group); return f === 'Cardio' ? 'cardio' : f === 'Mobilité' ? 'mobilite' : 'fitness'; }
+function exerciseSketch(ex) {
+  const family = groupFamily(ex.group); const accent = family === 'Cardio' ? '#ff668e' : family === 'Mobilité' ? '#46e6aa' : '#35cfff';
+  const armY = ['Pectoraux', 'Dos', 'Épaules', 'Bras'].includes(family) ? 18 : 25;
+  const squat = ['Jambes', 'Fessiers'].includes(family);
+  return `<svg class="exercise-sketch" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="10" r="5" fill="none" stroke="${accent}"/><path d="M32 15v20M32 21 19 ${armY}M32 21 45 ${armY}M32 35 ${squat ? '22 48' : '25 55'}M32 35 ${squat ? '43 48' : '39 55'}" fill="none" stroke="#dceaff" stroke-width="3" stroke-linecap="round"/><path d="M14 ${armY}h10M40 ${armY}h10" stroke="${accent}" stroke-width="4" stroke-linecap="round"/><circle cx="32" cy="27" r="7" fill="${accent}" opacity=".16"/></svg>`;
+}
+function bodyMapSVG(selected = '') {
+  const active = name => selected === name || selected === 'Full body' ? 'active-muscle' : '';
+  return `<svg class="body-map" viewBox="0 0 150 240" aria-label="Mannequin musculaire"><circle cx="75" cy="24" r="16"/><path class="body-base" d="M59 46 Q75 38 91 46 L104 101 91 142 96 222H78L75 155 72 222H54L59 142 46 101Z"/><path class="muscle ${active('Pectoraux')}" d="M57 52 Q75 43 93 52L88 82Q75 90 62 82Z"/><path class="muscle ${active('Épaules')}" d="M46 51Q51 43 59 47L55 75 45 69ZM91 47Q99 43 104 51L105 69 95 75Z"/><path class="muscle ${active('Bras')}" d="M44 70 55 75 49 118 37 113ZM95 75 106 70 113 113 101 118Z"/><path class="muscle ${active('Core')}" d="M64 84H86L89 126H61Z"/><path class="muscle ${active('Jambes')}" d="M59 142H74L70 218H53ZM76 142H91L97 218H80Z"/><path class="muscle ${active('Fessiers')}" d="M58 125Q75 118 92 125L90 151Q75 158 60 151Z"/><path class="muscle ${active('Dos')}" d="M62 53Q75 45 88 53L92 91Q75 103 58 91Z" opacity=".82"/></svg>`;
+}
+function openWorkoutWizard() {
+  workoutWizard = { step: 1, type: '', equipment: '', focus: '', selected: [] }; modal('', 'wizard-modal'); renderWorkoutWizard();
+}
+function renderWorkoutWizard() {
+  const content = document.getElementById('modal-content'); if (!workoutWizard) return;
+  const step = workoutWizard.step;
+  const header = `<div class="wizard-header"><div><small>CRÉATION GUIDÉE</small><h2>Nouveau workout</h2></div><span>${step}/4</span></div><div class="wizard-progress"><i style="width:${step * 25}%"></i></div>`;
+  if (step === 1) {
+    content.innerHTML = `${header}<p class="muted">Quel type d’activité souhaites-tu créer ?</p><div class="choice-grid">${[
+      ['fitness', '#i-dumbbell', 'Fitness', 'Musculation et renforcement'], ['cardio', '#i-heart', 'Cardio', 'Endurance, HIIT et vitesse'], ['mobilite', '#i-body', 'Mobilité', 'Souplesse et récupération']
+    ].map(([value, icon, title, text]) => `<button type="button" class="choice-card" data-wizard-type="${value}"><span><svg><use href="${icon}"/></svg></span><b>${title}</b><small>${text}</small></button>`).join('')}</div><button type="button" class="secondary full" id="cancel-wizard">Annuler</button>`;
+    content.querySelectorAll('[data-wizard-type]').forEach(btn => btn.onclick = () => { workoutWizard.type = btn.dataset.wizardType; workoutWizard.step = 2; renderWorkoutWizard(); });
+    document.getElementById('cancel-wizard').onclick = closeModal; return;
+  }
+  if (step === 2) {
+    const options = workoutWizard.type === 'fitness' ? [
+      ['bodyweight', 'Poids du corps', 'Sans matériel'], ['free', 'Poids libres', 'Haltères et barre'], ['machines', 'Machines', 'Machines et poulies'], ['mixed', 'Mixte', 'Tous les équipements']
+    ] : workoutWizard.type === 'cardio' ? [
+      ['none', 'Sans matériel', 'Course, sprints, HIIT'], ['bike', 'Vélo', 'Endurance sur vélo'], ['rower', 'Rameur', 'Cardio complet'], ['mixed', 'Mixte', 'Tous les formats']
+    ] : [['upper', 'Haut du corps', 'Épaules et dos'], ['lower', 'Bas du corps', 'Hanches et jambes'], ['full', 'Corps entier', 'Mobilité globale']];
+    content.innerHTML = `${header}<p class="muted">Choisis ton matériel ou ta zone principale.</p><div class="option-list">${options.map(([value, title, text]) => `<button type="button" data-wizard-equipment="${value}"><span><b>${title}</b><small>${text}</small></span><svg><use href="#i-chevron"/></svg></button>`).join('')}</div><div class="modal-actions"><button type="button" class="secondary" id="wizard-back">Retour</button></div>`;
+    content.querySelectorAll('[data-wizard-equipment]').forEach(btn => btn.onclick = () => { workoutWizard.equipment = btn.dataset.wizardEquipment; workoutWizard.step = 3; renderWorkoutWizard(); });
+    document.getElementById('wizard-back').onclick = () => { workoutWizard.step = 1; renderWorkoutWizard(); }; return;
+  }
+  if (step === 3) {
+    const focuses = workoutWizard.type === 'fitness' ? ['Pectoraux', 'Dos', 'Épaules', 'Bras', 'Jambes', 'Fessiers', 'Core', 'Full body'] : workoutWizard.type === 'cardio' ? ['Endurance', 'HIIT', 'Vitesse', 'Puissance'] : ['Mobilité', 'Core', 'Full body'];
+    content.innerHTML = `${header}<p class="muted">Sélectionne la zone ou l’objectif principal.</p><div class="muscle-selector"><div id="wizard-body-map">${bodyMapSVG(workoutWizard.focus)}</div><div class="muscle-grid">${focuses.map(f => `<button type="button" class="${workoutWizard.focus === f ? 'selected' : ''}" data-wizard-focus="${f}">${f}</button>`).join('')}</div></div><div class="modal-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-next" ${workoutWizard.focus ? '' : 'disabled'}>Voir les exercices</button></div>`;
+    content.querySelectorAll('[data-wizard-focus]').forEach(btn => btn.onclick = () => { workoutWizard.focus = btn.dataset.wizardFocus; renderWorkoutWizard(); });
+    document.getElementById('wizard-back').onclick = () => { workoutWizard.step = 2; renderWorkoutWizard(); };
+    document.getElementById('wizard-next').onclick = () => { workoutWizard.step = 4; renderWorkoutWizard(); }; return;
+  }
+  const available = wizardExercisePool();
+  content.innerHTML = `${header}<p class="muted">Appuie sur les exercices à ajouter. Tu pourras ensuite modifier les séries, répétitions et charges.</p><div class="wizard-exercises">${available.map(ex => `<button type="button" class="wizard-exercise ${workoutWizard.selected.includes(ex.id) ? 'selected' : ''}" data-wizard-exercise="${ex.id}"><span class="exercise-visual">${exerciseSketch(ex)}</span><span><b>${escapeHtml(ex.name)}</b><small>${escapeHtml(ex.group)} · ${escapeHtml(ex.equipment)}</small></span><i>${workoutWizard.selected.includes(ex.id) ? '✓' : '+'}</i></button>`).join('') || '<div class="empty">Aucun exercice ne correspond exactement. Choisis « Mixte » pour voir davantage d’options.</div>'}</div><div class="modal-actions sticky-actions"><button type="button" class="secondary" id="wizard-back">Retour</button><button type="button" class="primary" id="wizard-use" ${workoutWizard.selected.length ? '' : 'disabled'}>Ajouter ${workoutWizard.selected.length || ''}</button></div>`;
+  content.querySelectorAll('[data-wizard-exercise]').forEach(btn => btn.onclick = () => { const id = btn.dataset.wizardExercise; workoutWizard.selected = workoutWizard.selected.includes(id) ? workoutWizard.selected.filter(x => x !== id) : [...workoutWizard.selected, id]; renderWorkoutWizard(); });
+  document.getElementById('wizard-back').onclick = () => { workoutWizard.step = 3; renderWorkoutWizard(); };
+  document.getElementById('wizard-use').onclick = useWizardSelection;
+}
+function wizardExercisePool() {
+  let pool = EXERCISES.filter(ex => exerciseType(ex) === workoutWizard.type);
+  if (workoutWizard.type === 'fitness') {
+    const eq = workoutWizard.equipment;
+    if (eq === 'bodyweight') pool = pool.filter(ex => ex.equipment === 'Poids du corps' || ex.equipment === 'Aucun');
+    if (eq === 'free') pool = pool.filter(ex => ['Barre', 'Haltères', 'Haltère'].includes(ex.equipment));
+    if (eq === 'machines') pool = pool.filter(ex => ['Machine', 'Poulie', 'Élastique'].includes(ex.equipment));
+    if (workoutWizard.focus !== 'Full body') pool = pool.filter(ex => groupFamily(ex.group) === workoutWizard.focus || (workoutWizard.focus === 'Bras' && ['Biceps', 'Triceps'].some(x => ex.group.includes(x))));
+  } else if (workoutWizard.type === 'cardio') {
+    if (workoutWizard.equipment === 'none') pool = pool.filter(ex => ['Aucun', 'Poids du corps', 'Corde', 'Box'].includes(ex.equipment));
+    if (workoutWizard.equipment === 'bike') pool = pool.filter(ex => ex.name === 'Vélo');
+    if (workoutWizard.equipment === 'rower') pool = pool.filter(ex => ex.name === 'Rameur');
+    const focusMap = { Endurance: ['Endurance'], HIIT: ['Cardio'], Vitesse: ['Vitesse'], Puissance: ['Puissance'] };
+    if (workoutWizard.focus && workoutWizard.equipment === 'mixed') pool = pool.filter(ex => focusMap[workoutWizard.focus]?.includes(ex.group));
+  } else {
+    if (workoutWizard.equipment === 'upper') pool = pool.filter(ex => ex.name.includes('épaules'));
+    if (workoutWizard.equipment === 'lower') pool = pool.filter(ex => ex.name.includes('hanches') || ex.name.includes('squat'));
+  }
+  return pool.slice(0, 18);
+}
+function useWizardSelection() {
+  const selected = workoutWizard.selected.map(id => EXERCISES.find(ex => ex.id === id)).filter(Boolean);
+  editingWorkoutId = null; builder = selected.map(ex => defaultBuilderExercise(ex, workoutWizard.type));
+  const typeName = workoutWizard.type === 'fitness' ? 'Fitness' : workoutWizard.type === 'cardio' ? 'Cardio' : 'Mobilité';
+  document.getElementById('workout-name').value = `${typeName} · ${workoutWizard.focus || 'personnalisé'}`;
+  closeModal(); showView('training-view', false); renderBuilder(); setTimeout(() => document.querySelector('.builder-card').scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); toast(`${selected.length} exercices ajoutés`);
 }
 
 function renderNutrition() {
-  const mealsToday = state.meals.filter(m => m.date === TODAY());
-  const sums = mealsToday.reduce((a, m) => ({
-    kcal: a.kcal + Number(m.kcal || 0), protein: a.protein + Number(m.protein || 0),
-    carbs: a.carbs + Number(m.carbs || 0), fat: a.fat + Number(m.fat || 0), fiber: a.fiber + Number(m.fiber || 0)
-  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
-  document.getElementById('nutrition-stats').innerHTML = [
-    [`${formatNumber(sums.kcal)}`, 'kcal'], [`${formatNumber(sums.protein)} g`, 'protéines'],
-    [`${formatNumber(sums.carbs)} g`, 'glucides'], [`${formatNumber(sums.fat)} g`, 'lipides']
-  ].map(([v,l]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
-  const root = document.getElementById('meal-log');
-  root.innerHTML = mealsToday.length ? mealsToday.slice().reverse().map(m => `
-    <article class="meal-card">
-      <header><div><b>${escapeHtml(m.name)}</b><br><small>${formatNumber(m.kcal)} kcal · P ${formatNumber(m.protein)} g · G ${formatNumber(m.carbs)} g · L ${formatNumber(m.fat)} g</small></div><button class="remove-btn" data-delete-meal="${m.id}">×</button></header>
-      ${m.verdict ? `<p class="small">${escapeHtml(m.verdict)}</p>` : ''}
-    </article>`).join('') : '<div class="empty">Aucun repas enregistré aujourd’hui.</div>';
+  const totals = nutritionTotals();
+  document.getElementById('nutrition-stats').innerHTML = [[formatNumber(totals.kcal), 'kcal'], [`${formatNumber(totals.protein)} g`, 'protéines'], [`${formatNumber(totals.carbs)} g`, 'glucides'], [`${formatNumber(totals.fat)} g`, 'lipides']].map(([v, l]) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`).join('');
+  const root = document.getElementById('meal-log'); const meals = mealsFor().slice().reverse();
+  root.innerHTML = meals.length ? meals.map(m => `<article class="meal-card"><header><div><span class="meal-type">${escapeHtml(m.mealType || 'Repas')}</span><b>${escapeHtml(m.name)}</b><small>${escapeHtml(m.quantity || '')} · ${formatNumber(m.kcal)} kcal · P ${formatNumber(m.protein)} g · G ${formatNumber(m.carbs)} g · L ${formatNumber(m.fat)} g</small></div><div class="inline-actions"><button class="icon-action" data-edit-meal="${m.id}" aria-label="Modifier"><svg><use href="#i-edit"/></svg></button><button class="icon-action danger-icon" data-delete-meal="${m.id}" aria-label="Supprimer"><svg><use href="#i-trash"/></svg></button></div></header>${m.verdict ? `<p class="small">${escapeHtml(m.verdict)}</p>` : ''}</article>`).join('') : '<div class="empty">Aucun aliment enregistré aujourd’hui.</div>';
+  root.querySelectorAll('[data-edit-meal]').forEach(btn => btn.onclick = () => openFoodForm(state.meals.find(m => m.id === btn.dataset.editMeal), btn.dataset.editMeal));
   root.querySelectorAll('[data-delete-meal]').forEach(btn => btn.onclick = () => {
-    state.meals = state.meals.filter(m => m.id !== btn.dataset.deleteMeal); saveState(); renderNutrition();
+    const meal = state.meals.find(m => m.id === btn.dataset.deleteMeal);
+    confirmDelete('Supprimer cet aliment ?', `${meal?.name || 'Cet aliment'} sera retiré du total de la journée.`, () => { state.meals = state.meals.filter(m => m.id !== btn.dataset.deleteMeal); saveState(); renderAll(); toast('Aliment supprimé'); });
   });
 }
-
-function openFoodForm(prefill = {}) {
-  modal(`
-    <h2>Ajouter un aliment</h2>
-    <label>Nom<input id="food-name" value="${escapeHtml(prefill.name || '')}" placeholder="Ex. Poulet et riz"></label>
-    <div class="fields" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      <label>Calories<input type="number" id="food-kcal" value="${prefill.kcal ?? ''}" min="0"></label>
-      <label>Protéines (g)<input type="number" id="food-protein" value="${prefill.protein ?? ''}" min="0" step="0.1"></label>
-      <label>Glucides (g)<input type="number" id="food-carbs" value="${prefill.carbs ?? ''}" min="0" step="0.1"></label>
-      <label>Lipides (g)<input type="number" id="food-fat" value="${prefill.fat ?? ''}" min="0" step="0.1"></label>
-      <label>Fibres (g)<input type="number" id="food-fiber" value="${prefill.fiber ?? ''}" min="0" step="0.1"></label>
-      <label>Quantité<input id="food-quantity" value="${escapeHtml(prefill.quantity || '1 portion')}"></label>
-    </div>
-    ${prefill.verdict ? `<div class="scan-result"><b>Analyse</b><p>${escapeHtml(prefill.verdict)}</p></div>` : ''}
-    <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-food">Ajouter</button></div>`);
+function mealTypeOptions(selected = '') { return MEAL_TYPES.map(type => `<option ${type === selected ? 'selected' : ''}>${type}</option>`).join(''); }
+function openFoodForm(prefill = {}, editId = null) {
+  modal(`<h2>${editId ? 'Modifier' : 'Ajouter'} un aliment</h2><label>Moment de la journée<select id="food-meal-type">${mealTypeOptions(prefill.mealType || MEAL_TYPES[0])}</select></label><label>Nom<input id="food-name" value="${escapeHtml(prefill.name || '')}" placeholder="Ex. Poulet et riz"></label><div class="fields food-fields"><label>Calories<input type="number" id="food-kcal" value="${prefill.kcal ?? ''}" min="0"></label><label>Protéines (g)<input type="number" id="food-protein" value="${prefill.protein ?? ''}" min="0" step="0.1"></label><label>Glucides (g)<input type="number" id="food-carbs" value="${prefill.carbs ?? ''}" min="0" step="0.1"></label><label>Lipides (g)<input type="number" id="food-fat" value="${prefill.fat ?? ''}" min="0" step="0.1"></label><label>Fibres (g)<input type="number" id="food-fiber" value="${prefill.fiber ?? ''}" min="0" step="0.1"></label><label>Quantité<input id="food-quantity" value="${escapeHtml(prefill.quantity || '1 portion')}"></label></div>${prefill.verdict ? `<div class="scan-result"><b>Analyse</b><p>${escapeHtml(prefill.verdict)}</p></div>` : ''}<div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-food">${editId ? 'Enregistrer' : 'Ajouter'}</button></div>`);
   document.getElementById('cancel-modal').onclick = closeModal;
   document.getElementById('save-food').onclick = () => {
-    const name = document.getElementById('food-name').value.trim();
-    if (!name) return toast('Indique un nom');
-    state.meals.push({ id: uid(), date: TODAY(), name, quantity: document.getElementById('food-quantity').value, kcal: +document.getElementById('food-kcal').value, protein: +document.getElementById('food-protein').value, carbs: +document.getElementById('food-carbs').value, fat: +document.getElementById('food-fat').value, fiber: +document.getElementById('food-fiber').value, verdict: prefill.verdict || '' });
-    saveState(); closeModal(); renderNutrition(); toast('Aliment ajouté');
+    const name = document.getElementById('food-name').value.trim(); if (!name) return toast('Indique un nom');
+    const item = { id: editId || uid(), date: prefill.date || TODAY(), mealType: document.getElementById('food-meal-type').value, name, quantity: document.getElementById('food-quantity').value, kcal: +document.getElementById('food-kcal').value, protein: +document.getElementById('food-protein').value, carbs: +document.getElementById('food-carbs').value, fat: +document.getElementById('food-fat').value, fiber: +document.getElementById('food-fiber').value, verdict: prefill.verdict || '', qualityScore: prefill.qualityScore ?? 60, source: prefill.source || 'manual', barcode: prefill.barcode || '' };
+    if (editId) state.meals[state.meals.findIndex(m => m.id === editId)] = item; else state.meals.push(item);
+    saveState(); closeModal(); renderAll(); toast(editId ? 'Aliment modifié' : 'Aliment ajouté');
   };
 }
-
 function openScanner() {
-  modal(`
-    <h2>Scanner un produit</h2>
-    <p class="muted">Autorise la caméra, vise le code-barres ou entre le numéro manuellement.</p>
-    <video id="camera" class="camera-preview" playsinline muted></video>
-    <label>Code-barres<input id="barcode-input" inputmode="numeric" placeholder="Ex. 3017620422003"></label>
-    <div id="scan-status" class="small">La photo n’est pas enregistrée.</div>
-    <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="lookup-barcode">Analyser</button></div>`);
+  modal(`<h2>Scanner un produit</h2><p class="muted">Place simplement le code-barres dans le cadre. Dès qu’il est détecté, Arise recherche automatiquement le produit.</p><div id="qr-reader" class="qr-reader"></div><div id="scan-status" class="scan-status"><i></i><span>Initialisation de la caméra…</span></div><label class="scan-file-button">Scanner depuis une photo<input type="file" id="barcode-photo" accept="image/*" capture="environment"></label><div class="manual-barcode"><label>Ou saisir le code-barres<input id="barcode-input" inputmode="numeric" placeholder="Ex. 3017620422003"></label><button type="button" class="secondary" id="lookup-barcode">Rechercher</button></div><button type="button" class="secondary full" id="cancel-modal">Annuler</button>`, 'scanner-modal');
   document.getElementById('cancel-modal').onclick = closeModal;
   document.getElementById('lookup-barcode').onclick = () => lookupBarcode(document.getElementById('barcode-input').value.trim());
-  startCameraAndDetection();
+  document.getElementById('barcode-photo').onchange = e => e.target.files[0] && scanBarcodeFile(e.target.files[0]);
+  startAutomaticScanner();
 }
-
-async function startCameraAndDetection() {
-  const video = document.getElementById('camera');
-  const status = document.getElementById('scan-status');
-  if (!navigator.mediaDevices?.getUserMedia) {
-    status.textContent = 'Caméra indisponible ici. Entre le code-barres manuellement.';
-    return;
+function setScanStatus(text, type = '') {
+  const status = document.getElementById('scan-status'); if (!status) return;
+  status.className = `scan-status ${type}`.trim(); status.querySelector('span').textContent = text;
+}
+async function startAutomaticScanner() {
+  if (!window.Html5Qrcode) {
+    setScanStatus('Le module de scan n’a pas chargé. Saisis le numéro manuellement.', 'error'); return;
   }
   try {
-    activeStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-    video.srcObject = activeStream;
-    await video.play();
-    status.textContent = 'Caméra active. Recherche du code-barres…';
-    if ('BarcodeDetector' in window) {
-      const formats = await BarcodeDetector.getSupportedFormats();
-      const detector = new BarcodeDetector({ formats: formats.filter(f => ['ean_13','ean_8','upc_a','upc_e'].includes(f)) });
-      const loop = async () => {
-        if (!activeStream || document.getElementById('modal').open === false) return;
-        try {
-          const codes = await detector.detect(video);
-          if (codes[0]?.rawValue) {
-            document.getElementById('barcode-input').value = codes[0].rawValue;
-            status.textContent = `Code détecté : ${codes[0].rawValue}`;
-            stopCamera();
-            lookupBarcode(codes[0].rawValue);
-            return;
-          }
-        } catch {}
-        requestAnimationFrame(loop);
-      };
-      requestAnimationFrame(loop);
-    } else {
-      status.textContent = 'Caméra active. La détection automatique n’est pas supportée : entre le numéro sous le code-barres.';
-    }
+    const formats = [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128];
+    html5Scanner = new Html5Qrcode('qr-reader', { formatsToSupport: formats, verbose: false });
+    await html5Scanner.start({ facingMode: 'environment' }, { fps: 12, qrbox: (w, h) => ({ width: Math.min(w * .86, 330), height: Math.min(h * .34, 130) }), aspectRatio: 1.6 }, async decodedText => {
+      if (!/^\d{8,14}$/.test(decodedText)) return;
+      setScanStatus(`Produit détecté : ${decodedText}`, 'success'); await stopCamera(); lookupBarcode(decodedText);
+    }, () => {});
+    setScanStatus('Caméra active — vise le code-barres', 'active');
   } catch {
-    status.textContent = 'Accès caméra refusé ou indisponible. Entre le code-barres manuellement.';
+    setScanStatus('Caméra refusée ou indisponible. Utilise la photo ou la saisie manuelle.', 'error');
   }
 }
-
-function stopCamera() {
-  if (activeStream) activeStream.getTracks().forEach(t => t.stop());
-  activeStream = null;
+async function scanBarcodeFile(file) {
+  if (!window.Html5Qrcode) return toast('Module de scan indisponible');
+  setScanStatus('Analyse de la photo…', 'active');
+  try {
+    await stopCamera();
+    if (!html5Scanner) html5Scanner = new Html5Qrcode('qr-reader');
+    const code = await html5Scanner.scanFile(file, false);
+    if (!/^\d{8,14}$/.test(code)) throw new Error();
+    setScanStatus(`Produit détecté : ${code}`, 'success'); lookupBarcode(code);
+  } catch { setScanStatus('Code-barres non détecté sur cette photo.', 'error'); }
 }
-
+async function stopCamera() {
+  if (html5Scanner) {
+    try { if (html5Scanner.isScanning) await html5Scanner.stop(); } catch {}
+    try { html5Scanner.clear(); } catch {}
+    html5Scanner = null;
+  }
+  if (activeStream) activeStream.getTracks().forEach(t => t.stop()); activeStream = null;
+}
 async function lookupBarcode(code) {
   if (!/^\d{8,14}$/.test(code)) return toast('Code-barres invalide');
-  const status = document.getElementById('scan-status');
-  status.textContent = 'Recherche du produit…';
+  setScanStatus('Produit trouvé, chargement des informations…', 'active');
   try {
-    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,nutriments,nutriscore_grade,nova_group,ingredients_text,allergens_tags`);
-    if (!response.ok) throw new Error('network');
-    const json = await response.json();
-    if (json.status !== 1 || !json.product) {
-      status.textContent = 'Produit introuvable. Tu peux l’ajouter manuellement.';
-      return;
-    }
-    const p = json.product;
-    const n = p.nutriments || {};
-    const grade = String(p.nutriscore_grade || '').toUpperCase();
-    const verdict = nutritionVerdict(p);
-    stopCamera();
-    document.getElementById('modal-content').innerHTML = `
-      <h2>${escapeHtml(p.product_name || 'Produit')}</h2>
-      <p class="muted">${escapeHtml(p.brands || '')}</p>
-      <div class="scan-result">
-        <span class="score-pill">Nutri-Score ${grade || 'non renseigné'}</span>
-        <p><b>${escapeHtml(verdict)}</b></p>
-        <p class="small">Pour 100 g : ${formatNumber(n['energy-kcal_100g'])} kcal · protéines ${formatNumber(n.proteins_100g,1)} g · glucides ${formatNumber(n.carbohydrates_100g,1)} g · lipides ${formatNumber(n.fat_100g,1)} g · sel ${formatNumber(n.salt_100g,2)} g</p>
-        ${p.ingredients_text ? `<p class="small">Ingrédients : ${escapeHtml(p.ingredients_text).slice(0,450)}</p>` : ''}
-      </div>
-      <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Fermer</button><button type="button" class="primary" id="add-scanned-food">Ajouter au journal</button></div>`;
-    document.getElementById('cancel-modal').onclick = closeModal;
-    document.getElementById('add-scanned-food').onclick = () => openFoodForm({
-      name: p.product_name || 'Produit scanné', kcal: n['energy-kcal_100g'] || 0, protein: n.proteins_100g || 0,
-      carbs: n.carbohydrates_100g || 0, fat: n.fat_100g || 0, fiber: n.fiber_100g || 0,
-      quantity: '100 g', verdict
-    });
-  } catch {
-    status.textContent = 'Connexion impossible. Le scan nécessite Internet, mais aucune donnée personnelle n’est envoyée.';
-  }
+    const fields = 'code,product_name,brands,nutriments,nutriscore_grade,nova_group,ingredients_text,allergens_tags,serving_quantity,serving_size,product_quantity,quantity,image_front_small_url';
+    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${fields}`);
+    if (!response.ok) throw new Error(); const json = await response.json();
+    if (json.status !== 1 || !json.product) { setScanStatus('Produit introuvable. Ajoute-le manuellement.', 'error'); return; }
+    await stopCamera(); openScannedProduct(json.product, code);
+  } catch { setScanStatus('Connexion impossible. Le scan a besoin d’Internet pour identifier le produit.', 'error'); }
 }
-
+function gradeScore(grade) { return ({ A: 95, B: 82, C: 65, D: 45, E: 25 }[String(grade || '').toUpperCase()] ?? 55); }
+function openScannedProduct(p, code) {
+  const n = p.nutriments || {}; const verdict = nutritionVerdict(p); const grade = String(p.nutriscore_grade || '').toUpperCase();
+  const base = { kcal: Number(n['energy-kcal_100g'] || 0), protein: Number(n.proteins_100g || 0), carbs: Number(n.carbohydrates_100g || 0), fat: Number(n.fat_100g || 0), fiber: Number(n.fiber_100g || 0) };
+  const defaultQty = Math.round(Number(p.serving_quantity || 100)) || 100;
+  modal(`<div class="product-header">${p.image_front_small_url ? `<img src="${escapeHtml(p.image_front_small_url)}" alt="">` : '<span class="product-placeholder"><svg><use href="#i-food"/></svg></span>'}<div><span class="score-pill">Nutri-Score ${grade || 'N/A'}</span><h2>${escapeHtml(p.product_name || 'Produit scanné')}</h2><p>${escapeHtml(p.brands || '')}</p></div></div><div class="scan-result"><p><b>${escapeHtml(verdict)}</b></p><p class="small">Valeurs détectées automatiquement pour 100 g. Choisis maintenant la quantité consommée.</p></div><label>Moment de la journée<select id="scanned-meal-type">${mealTypeOptions(MEAL_TYPES[0])}</select></label><label>Quantité consommée<div class="quantity-input"><input type="number" id="scanned-quantity" value="${defaultQty}" min="1" step="1"><span>g / ml</span></div></label><div class="quantity-chips">${[50, 100, 150, 200, 250].map(q => `<button type="button" data-qty="${q}">${q} g</button>`).join('')}</div><div class="macro-preview" id="scanned-preview"></div><div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="add-scanned-food">Ajouter</button></div>`, 'product-modal');
+  const input = document.getElementById('scanned-quantity');
+  const update = () => { const q = Math.max(0, Number(input.value || 0)); const factor = q / 100; document.getElementById('scanned-preview').innerHTML = [['Calories', base.kcal * factor, 'kcal'], ['Protéines', base.protein * factor, 'g'], ['Glucides', base.carbs * factor, 'g'], ['Lipides', base.fat * factor, 'g']].map(([label, value, unit]) => `<div><small>${label}</small><b>${formatNumber(value, 1)} ${unit}</b></div>`).join(''); };
+  input.oninput = update; document.querySelectorAll('[data-qty]').forEach(btn => btn.onclick = () => { input.value = btn.dataset.qty; update(); }); update();
+  document.getElementById('cancel-modal').onclick = closeModal;
+  document.getElementById('add-scanned-food').onclick = () => {
+    const q = Math.max(1, Number(input.value || 0)); const factor = q / 100;
+    state.meals.push({ id: uid(), date: TODAY(), mealType: document.getElementById('scanned-meal-type').value, name: p.product_name || 'Produit scanné', quantity: `${formatNumber(q)} g`, kcal: base.kcal * factor, protein: base.protein * factor, carbs: base.carbs * factor, fat: base.fat * factor, fiber: base.fiber * factor, verdict, qualityScore: gradeScore(grade), source: 'scan', barcode: code });
+    saveState(); closeModal(); renderAll(); showView('nutrition-view', false); toast('Produit ajouté automatiquement');
+  };
+}
 function nutritionVerdict(p) {
-  const n = p.nutriments || {};
-  const positives = [];
-  const alerts = [];
-  if ((n.proteins_100g || 0) >= 10) positives.push('bonne teneur en protéines');
-  if ((n.fiber_100g || 0) >= 6) positives.push('riche en fibres');
-  if ((n.sugars_100g || 0) > 15) alerts.push('assez sucré');
-  if ((n.salt_100g || 0) > 1.5) alerts.push('assez salé');
-  if ((n['saturated-fat_100g'] || 0) > 5) alerts.push('riche en graisses saturées');
-  if ((p.nova_group || 0) >= 4) alerts.push('très transformé');
+  const n = p.nutriments || {}; const positives = []; const alerts = [];
+  if ((n.proteins_100g || 0) >= 10) positives.push('bonne teneur en protéines'); if ((n.fiber_100g || 0) >= 6) positives.push('riche en fibres');
+  if ((n.sugars_100g || 0) > 15) alerts.push('assez sucré'); if ((n.salt_100g || 0) > 1.5) alerts.push('assez salé'); if ((n['saturated-fat_100g'] || 0) > 5) alerts.push('riche en graisses saturées'); if ((p.nova_group || 0) >= 4) alerts.push('très transformé');
   if (!positives.length && !alerts.length) return 'Profil nutritionnel intermédiaire : regarde surtout la portion et la fréquence.';
   if (positives.length && !alerts.length) return `Plutôt intéressant : ${positives.join(' et ')}.`;
-  if (!positives.length && alerts.length) return `À consommer avec mesure : ${alerts.join(', ')}.`;
+  if (!positives.length) return `À consommer avec mesure : ${alerts.join(', ')}.`;
   return `Points positifs : ${positives.join(', ')}. À surveiller : ${alerts.join(', ')}.`;
 }
 
 function renderTracking() {
-  const today = TODAY();
-  const root = document.getElementById('habit-list');
-  root.innerHTML = state.habits.length ? state.habits.map(h => {
-    const done = !!h.checks[today];
-    const completed = Object.values(h.checks).filter(Boolean).length;
-    return `<article class="habit-card"><div class="habit-info"><b>${escapeHtml(h.name)}</b><small>${escapeHtml(h.target)} · ${completed} validations</small></div><button class="habit-check ${done?'done':''}" data-check-habit="${h.id}">✓</button></article>`;
-  }).join('') : '<div class="empty">Ajoute ta première habitude.</div>';
-  root.querySelectorAll('[data-check-habit]').forEach(btn => btn.onclick = () => {
-    const h = state.habits.find(x => x.id === btn.dataset.checkHabit);
-    h.checks[today] = !h.checks[today];
-    saveState(); renderTracking(); drawAllCharts();
-  });
+  renderRecovery();
+  const today = TODAY(); const root = document.getElementById('habit-list');
+  root.innerHTML = state.habits.length ? state.habits.map(h => { const done = !!h.checks?.[today]; const completed = Object.values(h.checks || {}).filter(Boolean).length; return `<article class="habit-card"><div class="habit-info"><b>${escapeHtml(h.name)}</b><small>${escapeHtml(h.target)} · ${completed} validations</small></div><div class="habit-actions"><button class="icon-action" data-edit-habit="${h.id}" aria-label="Modifier"><svg><use href="#i-edit"/></svg></button><button class="icon-action danger-icon" data-delete-habit="${h.id}" aria-label="Supprimer"><svg><use href="#i-trash"/></svg></button><button class="habit-check ${done ? 'done' : ''}" data-check-habit="${h.id}">✓</button></div></article>`; }).join('') : '<div class="empty">Ajoute ta première habitude.</div>';
+  root.querySelectorAll('[data-check-habit]').forEach(btn => btn.onclick = () => { const h = state.habits.find(x => x.id === btn.dataset.checkHabit); h.checks[today] = !h.checks[today]; saveState(); renderAll(); });
+  root.querySelectorAll('[data-edit-habit]').forEach(btn => btn.onclick = () => openHabitForm(state.habits.find(h => h.id === btn.dataset.editHabit)));
+  root.querySelectorAll('[data-delete-habit]').forEach(btn => btn.onclick = () => { const habit = state.habits.find(h => h.id === btn.dataset.deleteHabit); confirmDelete('Supprimer cette habitude ?', `${habit?.name || 'Cette habitude'} et son historique de validations seront supprimés.`, () => { state.habits = state.habits.filter(h => h.id !== btn.dataset.deleteHabit); saveState(); renderAll(); toast('Habitude supprimée'); }); });
   requestAnimationFrame(drawAllCharts);
 }
-
-function addHabit() {
-  modal(`
-    <h2>Nouvelle habitude</h2>
-    <label>Habitude<input id="habit-name" placeholder="Ex. Dormir 8 heures"></label>
-    <label>Fréquence<select id="habit-target"><option>Tous les jours</option><option>5 jours par semaine</option><option>3 jours par semaine</option><option>Jours ouvrés</option></select></label>
-    <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-habit">Ajouter</button></div>`);
+function openHabitForm(habit = null) {
+  modal(`<h2>${habit ? 'Modifier' : 'Nouvelle'} habitude</h2><label>Habitude<input id="habit-name" value="${escapeHtml(habit?.name || '')}" placeholder="Ex. Dormir 8 heures"></label><label>Fréquence<select id="habit-target">${['Tous les jours', '5 jours par semaine', '3 jours par semaine', 'Jours ouvrés'].map(x => `<option ${x === habit?.target ? 'selected' : ''}>${x}</option>`).join('')}</select></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-habit">${habit ? 'Enregistrer' : 'Ajouter'}</button></div>`);
   document.getElementById('cancel-modal').onclick = closeModal;
-  document.getElementById('save-habit').onclick = () => {
-    const name = document.getElementById('habit-name').value.trim();
-    if (!name) return toast('Écris une habitude');
-    state.habits.push({ id: uid(), name, target: document.getElementById('habit-target').value, checks: {} });
-    saveState(); closeModal(); renderTracking(); toast('Habitude ajoutée');
-  };
+  document.getElementById('save-habit').onclick = () => { const name = document.getElementById('habit-name').value.trim(); if (!name) return toast('Écris une habitude'); if (habit) { habit.name = name; habit.target = document.getElementById('habit-target').value; } else state.habits.push({ id: uid(), name, target: document.getElementById('habit-target').value, checks: {} }); saveState(); closeModal(); renderAll(); toast(habit ? 'Habitude modifiée' : 'Habitude ajoutée'); };
 }
-
-function editRadar() {
-  modal(`
-    <h2>Profil sportif</h2>
-    <p class="muted">Attribue une valeur de 0 à 100. Plus tard, ces scores pourront être calculés à partir de tests.</p>
-    ${Object.entries(state.radar).map(([k,v]) => `<label>${k} — <span id="radar-val-${k}">${v}</span><input type="range" min="0" max="100" value="${v}" data-radar="${k}"></label>`).join('')}
-    <div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-radar">Enregistrer</button></div>`);
-  document.querySelectorAll('[data-radar]').forEach(r => r.oninput = () => document.getElementById(`radar-val-${r.dataset.radar}`).textContent = r.value);
+function renderRecovery() {
+  const root = document.getElementById('recovery-card'); if (!root) return; const log = state.recoveryLogs[TODAY()];
+  root.innerHTML = log ? `<article class="recovery-card"><div class="recovery-score"><svg><use href="#i-moon"/></svg><b>${dailyScore().recovery}%</b></div><div class="recovery-info"><b>${formatNumber(log.sleepHours, 1)} h de sommeil</b><small>Qualité ${log.quality}/5 · Énergie ${log.energy}/5</small>${log.note ? `<p>${escapeHtml(log.note)}</p>` : ''}</div><div class="inline-actions"><button class="icon-action" id="edit-recovery"><svg><use href="#i-edit"/></svg></button><button class="icon-action danger-icon" id="delete-recovery"><svg><use href="#i-trash"/></svg></button></div></article>` : '<button class="empty recovery-empty" id="empty-recovery"><svg><use href="#i-moon"/></svg><span><b>Tu n’as pas encore noté ton repos</b><small>Ajoute ton sommeil et ton ressenti pour calculer ton score.</small></span></button>';
+  document.getElementById('edit-recovery')?.addEventListener('click', () => openRecoveryForm(log)); document.getElementById('empty-recovery')?.addEventListener('click', () => openRecoveryForm());
+  document.getElementById('delete-recovery')?.addEventListener('click', () => confirmDelete('Supprimer le repos du jour ?', 'Le score de récupération reviendra à zéro.', () => { delete state.recoveryLogs[TODAY()]; saveState(); renderAll(); toast('Repos supprimé'); }));
+}
+function openRecoveryForm(prefill = state.recoveryLogs[TODAY()] || {}) {
+  modal(`<h2>Repos & récupération</h2><p class="muted">Ces informations restent uniquement sur ton téléphone.</p><label>Sommeil : <b id="sleep-value">${prefill.sleepHours ?? 8} h</b><input type="range" id="sleep-hours" min="0" max="12" step="0.5" value="${prefill.sleepHours ?? 8}"></label><label>Qualité du sommeil<select id="sleep-quality">${[1, 2, 3, 4, 5].map(v => `<option value="${v}" ${Number(prefill.quality || 3) === v ? 'selected' : ''}>${v}/5</option>`).join('')}</select></label><label>Niveau d’énergie<select id="energy-level">${[1, 2, 3, 4, 5].map(v => `<option value="${v}" ${Number(prefill.energy || 3) === v ? 'selected' : ''}>${v}/5</option>`).join('')}</select></label><label>Note facultative<input id="recovery-note" value="${escapeHtml(prefill.note || '')}" placeholder="Ex. Réveils pendant la nuit"></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-recovery">Enregistrer</button></div>`);
+  const slider = document.getElementById('sleep-hours'); slider.oninput = () => document.getElementById('sleep-value').textContent = `${slider.value} h`;
   document.getElementById('cancel-modal').onclick = closeModal;
-  document.getElementById('save-radar').onclick = () => {
-    document.querySelectorAll('[data-radar]').forEach(r => state.radar[r.dataset.radar] = +r.value);
-    saveState(); closeModal(); drawAllCharts();
-  };
+  document.getElementById('save-recovery').onclick = () => { state.recoveryLogs[TODAY()] = { sleepHours: Number(slider.value), quality: Number(document.getElementById('sleep-quality').value), energy: Number(document.getElementById('energy-level').value), note: document.getElementById('recovery-note').value.trim() }; saveState(); closeModal(); renderAll(); toast('Repos enregistré'); };
+}
+function editRadar() {
+  modal(`<h2>Profil sportif</h2><p class="muted">Attribue une valeur de 0 à 100.</p>${Object.entries(state.radar).map(([k, v]) => `<label>${k} — <span id="radar-val-${k}">${v}</span><input type="range" min="0" max="100" value="${v}" data-radar="${k}"></label>`).join('')}<div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-radar">Enregistrer</button></div>`);
+  document.querySelectorAll('[data-radar]').forEach(r => r.oninput = () => document.getElementById(`radar-val-${r.dataset.radar}`).textContent = r.value);
+  document.getElementById('cancel-modal').onclick = closeModal; document.getElementById('save-radar').onclick = () => { document.querySelectorAll('[data-radar]').forEach(r => state.radar[r.dataset.radar] = +r.value); saveState(); closeModal(); drawAllCharts(); };
 }
 
 function canvasSetup(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = canvas.clientWidth || 340;
-  const ratio = Number(canvas.getAttribute('height')) / Number(canvas.getAttribute('width'));
-  const cssH = cssW * ratio;
-  canvas.width = cssW * dpr;
-  canvas.height = cssH * dpr;
-  canvas.style.height = `${cssH}px`;
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, w: cssW, h: cssH };
+  const dpr = window.devicePixelRatio || 1; const cssW = canvas.clientWidth || 340; const ratio = Number(canvas.getAttribute('height')) / Number(canvas.getAttribute('width')); const cssH = cssW * ratio;
+  canvas.width = cssW * dpr; canvas.height = cssH * dpr; canvas.style.height = `${cssH}px`; const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w: cssW, h: cssH };
 }
-
 function drawRadar() {
-  const canvas = document.getElementById('radar-chart'); if (!canvas) return;
-  const { ctx, w, h } = canvasSetup(canvas);
-  const labels = Object.keys(state.radar), vals = Object.values(state.radar);
-  const cx = w/2, cy = h/2 + 4, radius = Math.min(w,h)*.32, n = labels.length;
-  ctx.clearRect(0,0,w,h);
-  ctx.strokeStyle = 'rgba(88,119,170,.16)'; ctx.lineWidth = 1;
-  for (let level=1; level<=5; level++) {
-    ctx.beginPath();
-    for (let i=0;i<n;i++) { const a=-Math.PI/2+i*2*Math.PI/n, r=radius*level/5; const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
-    ctx.closePath(); ctx.stroke();
-  }
-  for (let i=0;i<n;i++) { const a=-Math.PI/2+i*2*Math.PI/n; ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*radius,cy+Math.sin(a)*radius);ctx.stroke(); }
-  ctx.beginPath();
-  vals.forEach((v,i)=>{const a=-Math.PI/2+i*2*Math.PI/n,r=radius*v/100,x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
-  ctx.closePath(); const radarGradient=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);radarGradient.addColorStop(0,'rgba(31,214,255,.30)');radarGradient.addColorStop(.65,'rgba(47,123,255,.28)');radarGradient.addColorStop(1,'rgba(134,92,255,.24)');ctx.fillStyle=radarGradient;ctx.fill();ctx.shadowColor='#20c8ff';ctx.shadowBlur=14;ctx.strokeStyle='#23c7ff';ctx.lineWidth=2.2;ctx.stroke();ctx.shadowBlur=0; vals.forEach((v,i)=>{const a=-Math.PI/2+i*2*Math.PI/n,r=radius*v/100,x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fillStyle=i>3?'#8b67ff':'#29cfff';ctx.fill();});
-  ctx.fillStyle='#dce7fa';ctx.font='10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
-  labels.forEach((label,i)=>{const a=-Math.PI/2+i*2*Math.PI/n,r=radius+24;ctx.fillText(label,cx+Math.cos(a)*r,cy+Math.sin(a)*r)});
+  const canvas = document.getElementById('radar-chart'); if (!canvas) return; const { ctx, w, h } = canvasSetup(canvas); const labels = Object.keys(state.radar), vals = Object.values(state.radar); const cx = w / 2, cy = h / 2 + 4, radius = Math.min(w, h) * .32, n = labels.length; ctx.clearRect(0, 0, w, h); ctx.strokeStyle = 'rgba(88,119,170,.16)'; ctx.lineWidth = 1;
+  for (let level = 1; level <= 5; level++) { ctx.beginPath(); for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius * level / 5, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); ctx.stroke(); }
+  for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius); ctx.stroke(); }
+  ctx.beginPath(); vals.forEach((v, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius * v / 100, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius); g.addColorStop(0, 'rgba(31,214,255,.30)'); g.addColorStop(.65, 'rgba(47,123,255,.28)'); g.addColorStop(1, 'rgba(134,92,255,.24)'); ctx.fillStyle = g; ctx.fill(); ctx.shadowColor = '#20c8ff'; ctx.shadowBlur = 14; ctx.strokeStyle = '#23c7ff'; ctx.lineWidth = 2.2; ctx.stroke(); ctx.shadowBlur = 0;
+  vals.forEach((v, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius * v / 100, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fillStyle = i > 3 ? '#8b67ff' : '#29cfff'; ctx.fill(); }); ctx.fillStyle = '#dce7fa'; ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; labels.forEach((label, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius + 24; ctx.fillText(label, cx + Math.cos(a) * r, cy + Math.sin(a) * r); });
 }
-
-function last7Days() {
-  return Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d.toISOString().slice(0,10)});
+function last7Days() { return Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return localDateKey(d); }); }
+function drawBarChart(canvasId, labels, values, suffix = '') {
+  const canvas = document.getElementById(canvasId); if (!canvas) return; const { ctx, w, h } = canvasSetup(canvas); ctx.clearRect(0, 0, w, h); const pad = { l: 30, r: 8, t: 15, b: 28 }; const max = Math.max(1, ...values) * 1.15; const innerW = w - pad.l - pad.r, innerH = h - pad.t - pad.b; ctx.strokeStyle = 'rgba(101,125,165,.13)'; ctx.fillStyle = '#65718a'; ctx.font = '9px system-ui';
+  for (let i = 0; i <= 4; i++) { const y = pad.t + innerH * i / 4; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke(); const v = Math.round(max * (1 - i / 4)); ctx.fillText(`${v}${suffix}`, 2, y + 3); }
+  const slot = innerW / values.length, bw = Math.max(8, slot * .55); values.forEach((v, i) => { const bh = innerH * v / max, x = pad.l + i * slot + (slot - bw) / 2, y = pad.t + innerH - bh; const g = ctx.createLinearGradient(0, y, 0, pad.t + innerH); g.addColorStop(0, '#22c9ff'); g.addColorStop(.48, '#367cff'); g.addColorStop(1, '#7959ff'); ctx.fillStyle = g; ctx.shadowColor = 'rgba(38,158,255,.45)'; ctx.shadowBlur = 9; roundRect(ctx, x, y, bw, bh, 6); ctx.fill(); ctx.shadowBlur = 0; ctx.fillStyle = '#69758b'; ctx.textAlign = 'center'; ctx.fillText(labels[i], x + bw / 2, h - 9); }); ctx.textAlign = 'left';
 }
-function drawBarChart(canvasId, labels, values, suffix='') {
-  const canvas = document.getElementById(canvasId); if (!canvas) return;
-  const { ctx, w, h } = canvasSetup(canvas); ctx.clearRect(0,0,w,h);
-  const pad={l:30,r:8,t:15,b:28}; const max=Math.max(1,...values)*1.15; const innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
-  ctx.strokeStyle='rgba(101,125,165,.13)';ctx.fillStyle='#65718a';ctx.font='9px system-ui';
-  for(let i=0;i<=4;i++){const y=pad.t+innerH*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();const v=Math.round(max*(1-i/4));ctx.fillText(`${v}${suffix}`,2,y+3)}
-  const slot=innerW/values.length, bw=Math.max(8,slot*.55);
-  values.forEach((v,i)=>{const bh=innerH*v/max,x=pad.l+i*slot+(slot-bw)/2,y=pad.t+innerH-bh;const g=ctx.createLinearGradient(0,y,0,pad.t+innerH);g.addColorStop(0,'#22c9ff');g.addColorStop(.48,'#367cff');g.addColorStop(1,'#7959ff');ctx.fillStyle=g;ctx.shadowColor='rgba(38,158,255,.45)';ctx.shadowBlur=9;roundRect(ctx,x,y,bw,bh,6);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#69758b';ctx.textAlign='center';ctx.fillText(labels[i],x+bw/2,h-9)});
-  ctx.textAlign='left';
-}
-function roundRect(ctx,x,y,w,h,r){ if(h<0){y+=h;h=-h} r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath(); }
+function roundRect(ctx, x, y, w, h, r) { if (h < 0) { y += h; h = -h; } r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 function drawAllCharts() {
-  drawRadar();
-  const days = last7Days();
-  const volume = days.map(day => state.sessions.filter(s => s.date.slice(0,10) === day).reduce((a,s)=>a+(s.volume||0),0)/1000);
-  drawBarChart('volume-chart', days.map(d=>new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,2)), volume.map(v=>Math.round(v*10)/10), 't');
-  const habitValues = days.map(day => state.habits.length ? Math.round(state.habits.filter(h=>h.checks[day]).length/state.habits.length*100) : 0);
-  drawBarChart('habit-chart', days.map(d=>new Date(d+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short'}).slice(0,2)), habitValues, '%');
+  drawRadar(); const days = last7Days(); const volume = days.map(day => state.sessions.filter(s => sessionDateKey(s) === day).reduce((a, s) => a + Number(s.volume || 0), 0) / 1000); drawBarChart('volume-chart', days.map(d => new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 2)), volume.map(v => Math.round(v * 10) / 10), 't'); const habitValues = days.map(day => state.habits.length ? Math.round(state.habits.filter(h => h.checks?.[day]).length / state.habits.length * 100) : 0); drawBarChart('habit-chart', days.map(d => new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 2)), habitValues, '%');
 }
 
 function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = url; a.download = `arise-sauvegarde-${TODAY()}.json`; a.click(); URL.revokeObjectURL(url);
-  toast('Sauvegarde exportée');
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `arise-sauvegarde-${TODAY()}.json`; a.click(); URL.revokeObjectURL(url); toast('Sauvegarde exportée');
 }
 function importData(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(reader.result);
-      if (!parsed || !Array.isArray(parsed.workouts) || !Array.isArray(parsed.habits)) throw new Error();
-      state = { ...initialState(), ...parsed }; saveState(); renderAll(); toast('Sauvegarde importée');
-    } catch { toast('Fichier de sauvegarde invalide'); }
-  };
-  reader.readAsText(file);
+  const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(reader.result); if (!parsed || !Array.isArray(parsed.workouts) || !Array.isArray(parsed.habits)) throw new Error(); state = normalizeState(parsed); saveState(); renderAll(); toast('Sauvegarde importée'); } catch { toast('Fichier de sauvegarde invalide'); } }; reader.readAsText(file);
 }
 function resetData() {
-  modal(`<h2>Effacer toutes les données ?</h2><p>Cette action supprime workouts, séances, repas et habitudes de cet appareil.</p><div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="confirm-reset">Effacer</button></div>`);
-  document.getElementById('cancel-modal').onclick = closeModal;
-  document.getElementById('confirm-reset').onclick = () => { state = initialState(); saveState(); closeModal(); renderAll(); toast('Données effacées'); };
+  confirmDelete('Effacer toutes les données ?', 'Cette action supprime workouts, séances, repas, repos et habitudes de cet appareil.', () => { state = initialState(); saveState(); clearBuilder(true); renderAll(); toast('Données effacées'); });
 }
-
 function setupEvents() {
   document.getElementById('exercise-search').addEventListener('input', e => renderExerciseResults(e.target.value));
-  document.getElementById('clear-builder').onclick = () => { builder = []; renderBuilder(); };
-  document.getElementById('save-workout').onclick = saveWorkout;
-  document.getElementById('recommend-workout').onclick = recommendWorkout;
-  document.getElementById('open-food-form').onclick = () => openFoodForm();
-  document.getElementById('open-scanner').onclick = openScanner;
-  document.getElementById('meal-add-inline').onclick = () => openFoodForm();
-  document.getElementById('quick-meal').onclick = () => openFoodForm();
-  document.getElementById('quick-scan').onclick = openScanner;
-  document.getElementById('quick-start').onclick = () => {
-    if (state.workouts[0]) openSession(state.workouts[0].id);
-    else showView('training-view');
-  };
-  document.getElementById('add-habit').onclick = addHabit;
-  document.getElementById('edit-radar').onclick = editRadar;
-  document.getElementById('export-data').onclick = exportData;
-  document.getElementById('import-data').onchange = e => e.target.files[0] && importData(e.target.files[0]);
-  document.getElementById('reset-data').onclick = resetData;
-  document.getElementById('modal').addEventListener('close', stopCamera);
-  window.addEventListener('resize', () => { if (document.getElementById('tracking-view').classList.contains('active')) drawAllCharts(); });
+  document.getElementById('clear-builder').onclick = () => clearBuilder(); document.getElementById('save-workout').onclick = saveWorkout; document.getElementById('recommend-workout').onclick = recommendWorkout;
+  document.getElementById('open-workout-wizard').onclick = openWorkoutWizard; document.getElementById('wizard-launch-card').onclick = openWorkoutWizard;
+  document.getElementById('open-food-form').onclick = () => openFoodForm(); document.getElementById('open-scanner').onclick = openScanner; document.getElementById('meal-add-inline').onclick = () => openFoodForm(); document.getElementById('quick-meal').onclick = () => openFoodForm(); document.getElementById('quick-scan').onclick = openScanner;
+  document.getElementById('quick-start').onclick = () => state.workouts[0] ? openSession(state.workouts[0].id) : openWorkoutWizard();
+  document.getElementById('quick-recovery').onclick = () => openRecoveryForm(); document.getElementById('log-recovery').onclick = () => openRecoveryForm();
+  document.getElementById('add-habit').onclick = () => openHabitForm(); document.getElementById('edit-radar').onclick = editRadar;
+  document.getElementById('home-score-card').onclick = openScoreDetails; document.getElementById('home-score-card').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') openScoreDetails(); };
+  document.getElementById('export-data').onclick = exportData; document.getElementById('import-data').onchange = e => e.target.files[0] && importData(e.target.files[0]); document.getElementById('reset-data').onclick = resetData;
+  document.getElementById('modal').addEventListener('close', stopCamera); window.addEventListener('resize', () => { if (document.getElementById('tracking-view').classList.contains('active')) drawAllCharts(); });
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstallPrompt = e; document.getElementById('install-btn').hidden = false; });
-  document.getElementById('install-btn').onclick = async () => { if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; document.getElementById('install-btn').hidden = true; } else { toast('Sur iPhone : Safari → Partager → Sur l’écran d’accueil'); } };
+  document.getElementById('install-btn').onclick = async () => { if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; document.getElementById('install-btn').hidden = true; } else toast('Sur iPhone : Safari → Partager → Sur l’écran d’accueil'); };
 }
-
-function renderAll() {
-  renderHome(); renderTraining(); renderNutrition(); renderTracking();
-}
+function renderAll() { renderHome(); renderTraining(); renderNutrition(); renderTracking(); }
 
 setupNavigation(); setupEvents(); renderAll();
-if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));

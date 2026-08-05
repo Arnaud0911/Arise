@@ -6,11 +6,12 @@ Prototype mobile installable d'Arise avec interface sombre premium, stockage loc
 
 - Accueil premium avec Score Arise, résumé quotidien et actions rapides
 - Design sombre futuriste, glassmorphism et accents bleu/cyan/violet
-- Plus de 40 exercices, création et lancement de workouts
+- Plus de 40 exercices, création guidée par activité, matériel et groupe musculaire
 - Enregistrement des séries, répétitions, charges, RPE et volume
 - Journal alimentaire avec calories et macronutriments
-- Caméra, saisie de code-barres et recherche Open Food Facts
-- Radar sportif, graphiques sur 7 jours et habitudes personnalisées
+- Scan automatique des codes-barres sur iPhone, quantité consommée, type de repas et recherche Open Food Facts
+- Score quotidien calculé à partir du training, de la nutrition, du repos et des habitudes
+- Ajout, modification et suppression avec confirmation des workouts, séances, aliments, repos et habitudes
 - Profil et espace de sécurité avec export/import des données
 - PWA installable et interface principale disponible hors connexion
 
