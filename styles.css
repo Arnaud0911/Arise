@@ -222,7 +222,7 @@ canvas { width:100%;height:auto;display:block; }
 .info-card { margin-top:13px; }
 .version-pill { padding:6px 9px;color:#7cc9ff;background:rgba(47,123,255,.08); }
 .info-card h3 { margin:10px 0 6px; }.info-card p { margin:0;color:var(--muted);font-size:10px;line-height:1.55; }
-.bottom-nav { position:fixed;z-index:40;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,600px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 9px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(6,8,14,.9),rgba(4,6,10,.98));backdrop-filter:blur(28px) saturate(150%);border-top:1px solid rgba(255,255,255,.06);box-shadow:0 -15px 45px rgba(0,0,0,.28); }
+.bottom-nav { position:fixed;z-index:60;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,600px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 9px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(6,8,14,.9),rgba(4,6,10,.98));backdrop-filter:blur(28px) saturate(150%);border-top:1px solid rgba(255,255,255,.06);box-shadow:0 -15px 45px rgba(0,0,0,.28); }
 .nav-item { border:0;background:transparent;color:#5d6679;padding:6px 3px;border-radius:15px;transition:.2s ease; }
 .nav-item > span { margin:auto;width:36px;height:28px;display:grid;place-items:center;border-radius:11px; }
 .nav-item svg { font-size:21px; }
@@ -231,6 +231,9 @@ canvas { width:100%;height:auto;display:block; }
 .nav-item.active > span { background:linear-gradient(135deg,rgba(47,123,255,.15),rgba(134,92,255,.1));box-shadow:0 0 20px rgba(47,123,255,.12); }
 dialog { border:0;padding:0;background:transparent;width:min(92vw,540px);color:var(--text); }
 dialog::backdrop { background:rgba(0,0,0,.78);backdrop-filter:blur(10px); }
+dialog.wizard-open { position:fixed;inset:calc(env(safe-area-inset-top) + 58px) 10px calc(env(safe-area-inset-bottom) + 82px);margin:auto;z-index:50;max-height:calc(100dvh - 150px);overflow:visible; }
+dialog.wizard-open .modal-card { max-height:calc(100dvh - 150px);overflow:auto; }
+
 .modal-card { background:linear-gradient(150deg,#111724,#090c14);border:1px solid var(--line-strong);border-radius:26px;padding:19px;max-height:87vh;overflow:auto;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 40px rgba(47,123,255,.08); }
 .modal-card h2 { margin-top:0;letter-spacing:-.03em; }
 .modal-card .muted { color:var(--muted);font-size:11px; }

@@ -94,14 +94,20 @@ function modal(html, extraClass = '') {
   const dlg = document.getElementById('modal');
   stopCamera();
   const content = document.getElementById('modal-content');
+  const isWizard = extraClass.includes('wizard-modal');
   content.className = `modal-card ${extraClass}`.trim();
   content.innerHTML = html;
-  if (!dlg.open) dlg.showModal();
+  dlg.classList.toggle('wizard-open', isWizard);
+  if (!dlg.open) {
+    // L'assistant de création reste navigable : la barre du bas doit rester cliquable.
+    if (isWizard) dlg.show(); else dlg.showModal();
+  }
 }
 function closeModal() {
   stopCamera();
   const dlg = document.getElementById('modal');
   if (dlg.open) dlg.close();
+  dlg.classList.remove('wizard-open');
 }
 function confirmDelete(title, message, onConfirm) {
   modal(`<div class="confirm-icon"><svg><use href="#i-trash"/></svg></div><h2>${escapeHtml(title)}</h2><p class="muted">${escapeHtml(message)}</p><div class="modal-actions"><button type="button" class="secondary" id="cancel-confirm">Annuler</button><button type="button" class="danger-button" id="confirm-delete">Supprimer</button></div>`);
@@ -118,10 +124,16 @@ function showView(viewId, smooth = true) {
   if (viewId === 'tracking-view') requestAnimationFrame(drawAllCharts);
 }
 function setupNavigation() {
-  document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.view)));
-  document.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => showView(btn.dataset.go)));
-  document.getElementById('brand-home').onclick = () => showView('home-view');
-  document.getElementById('open-settings').onclick = () => showView('settings-view');
+  document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => {
+    closeModal();
+    showView(btn.dataset.view);
+  }));
+  document.querySelectorAll('[data-go]').forEach(btn => btn.addEventListener('click', () => {
+    closeModal();
+    showView(btn.dataset.go);
+  }));
+  document.getElementById('brand-home').onclick = () => { closeModal(); showView('home-view'); };
+  document.getElementById('open-settings').onclick = () => { closeModal(); showView('settings-view'); };
 }
 
 function mealsFor(dateKey = TODAY()) { return state.meals.filter(m => (m.date || TODAY()) === dateKey); }

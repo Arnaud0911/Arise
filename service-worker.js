@@ -1,4 +1,4 @@
-const CACHE = 'arise-v4-guided-training-nutrition';
+const CACHE = 'arise-v5-navigation-fix';
 const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192-v3.png','./icons/icon-512-v3.png','./icons/apple-touch-icon-v3.png'];
 self.addEventListener('install', event => {
   self.skipWaiting();
