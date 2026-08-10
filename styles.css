@@ -312,6 +312,18 @@ dialog::backdrop { background:rgba(0,0,0,.78);backdrop-filter:blur(10px); }
 .option-list b { font-size:12px; }.option-list small { color:var(--muted);font-size:8px;margin-top:3px; }.option-list svg { color:#5f6d84; }
 .muscle-selector { display:grid;grid-template-columns:160px 1fr;gap:14px;align-items:start;margin:12px 0; }
 .muscle-selector-large { grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:16px;align-items:stretch; }
+
+.single-focus-stage { grid-template-columns:minmax(68px,20vw) minmax(0,1fr); align-items:start; }
+.muscle-stage-xl { padding:10px 8px 8px; }
+.muscle-stage-xl .muscle-stage-copy b { font-size:11px; line-height:1.2; }
+.muscle-stage-xl .muscle-stage-copy span { display:none; }
+.muscle-stage-xl #wizard-body-map { margin-top:8px; }
+.muscle-stage-xl .body-map { width:100%; max-height:none; aspect-ratio:1 / 1.6; }
+.single-focus-stage .focus-group-grid { gap:10px; }
+.single-focus-stage .muscle-stage-copy small { font-size:7px; margin-bottom:4px; }
+.single-focus-stage .focus-card { min-height:58px;padding:14px 14px; }
+.single-focus-stage .focus-card b { font-size:12px; }
+.single-focus-stage .focus-card span { font-size:8px; }
 .muscle-stage { border:1px solid rgba(64,128,255,.16);border-radius:24px;padding:14px;background:linear-gradient(155deg,rgba(14,20,31,.96),rgba(7,10,18,.98));box-shadow:inset 0 0 0 1px rgba(116,154,255,.04),0 14px 40px rgba(0,0,0,.22); }
 .muscle-stage-copy small,.focus-label { display:block;color:#7aa6ff;font-size:8px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px; }
 .muscle-stage-copy b { display:block;font-size:15px;margin-bottom:4px; }
@@ -409,4 +421,6 @@ dialog::backdrop { background:rgba(0,0,0,.78);backdrop-filter:blur(10px); }
   .exercise-visual { width:82px;height:108px; }
   .exercise-mini { width:58px;height:74px; }
   .body-map { max-height:320px; }
+  .muscle-stage-xl .body-map { max-height:380px; }
+  .single-focus-stage { grid-template-columns:minmax(64px,20vw) minmax(0,1fr); }
 }
