@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-v3.png" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=1.5.4" />
   <title>Arise</title>
 </head>
 <body>
@@ -192,20 +192,54 @@
           <label class="file-button"><span><b>Importer une sauvegarde</b><small>Restaurer tes données locales</small></span><svg><use href="#i-chevron"/></svg><input type="file" id="import-data" accept="application/json" hidden /></label>
           <button id="reset-data" class="danger-row"><span><b>Effacer toutes mes données</b><small>Action irréversible</small></span><svg><use href="#i-chevron"/></svg></button>
         </div>
-        <div class="card info-card"><span class="version-pill">ARISE BETA 1.1</span><h3>Application privée de test</h3><p>Pas de compte, pas de publicité et pas de suivi analytique. Les analyses nutritionnelles restent indicatives.</p></div>
+        <div class="card info-card"><span class="version-pill">ARISE BETA 1.5.4</span><h3>Application privée de test</h3><p>Pas de compte, pas de publicité et pas de suivi analytique. Les analyses nutritionnelles restent indicatives.</p></div>
       </section>
     </main>
 
     <nav class="bottom-nav" aria-label="Navigation principale">
-      <button class="nav-item active" data-view="home-view"><span><svg><use href="#i-home"/></svg></span><small>Accueil</small></button>
-      <button class="nav-item" data-view="training-view"><span><svg><use href="#i-dumbbell"/></svg></span><small>Training</small></button>
-      <button class="nav-item" data-view="nutrition-view"><span><svg><use href="#i-food"/></svg></span><small>Alimentation</small></button>
-      <button class="nav-item" data-view="tracking-view"><span><svg><use href="#i-target"/></svg></span><small>Tracking</small></button>
+      <a class="nav-item active" href="#home-view" data-view="home-view" aria-label="Accueil"><span><svg><use href="#i-home"/></svg></span><small>Accueil</small></a>
+      <a class="nav-item" href="#training-view" data-view="training-view" aria-label="Training"><span><svg><use href="#i-dumbbell"/></svg></span><small>Training</small></a>
+      <a class="nav-item" href="#nutrition-view" data-view="nutrition-view" aria-label="Alimentation"><span><svg><use href="#i-food"/></svg></span><small>Alimentation</small></a>
+      <a class="nav-item" href="#tracking-view" data-view="tracking-view" aria-label="Tracking"><span><svg><use href="#i-target"/></svg></span><small>Tracking</small></a>
     </nav>
   </div>
 
+  <section id="wizard-panel" class="wizard-panel" aria-hidden="true">
+    <div class="modal-card wizard-modal" id="wizard-content"></div>
+  </section>
   <dialog id="modal"><form method="dialog" class="modal-card" id="modal-content"></form></dialog>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" crossorigin="anonymous"></script>
-  <script src="app.js"></script>
+  <script>
+    // Navigation de secours ultra légère : fonctionne même si app.js rencontre une erreur.
+    (function () {
+      // Pendant la phase de test, supprimer les anciens caches PWA pour éviter qu'iOS garde une version obsolète.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (reg) { reg.unregister(); });
+        }).catch(function () {});
+      }
+      if ('caches' in window) {
+        caches.keys().then(function (keys) {
+          keys.filter(function (key) { return key.indexOf('arise-') === 0; })
+            .forEach(function (key) { caches.delete(key); });
+        }).catch(function () {});
+      }
+      function activateFromHash() {
+        var id = (location.hash || '#home-view').slice(1);
+        var target = document.getElementById(id);
+        if (!target || !target.classList.contains('view')) return;
+        document.querySelectorAll('.view').forEach(function (view) {
+          view.classList.toggle('active', view.id === id);
+        });
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(function (item) {
+          item.classList.toggle('active', item.getAttribute('href') === '#' + id);
+        });
+      }
+      window.addEventListener('hashchange', activateFromHash);
+      window.addEventListener('DOMContentLoaded', activateFromHash);
+      window.ariseFallbackNavigate = activateFromHash;
+    })();
+  </script>
+  <script src="app.js?v=1.5.4"></script>
 </body>
 </html>
