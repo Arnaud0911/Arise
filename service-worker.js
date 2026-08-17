@@ -1,4 +1,4 @@
-const CACHE = 'arise-v8-native-nav-155';
+const CACHE = 'arise-v9-multigroup-156';
 const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192-v3.png','./icons/icon-512-v3.png','./icons/apple-touch-icon-v3.png'];
 self.addEventListener('install', event => {
   self.skipWaiting();
