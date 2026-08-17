@@ -476,7 +476,7 @@ function bodyMapSVG(selected = '') {
 function multiGroupBodyMapSVG(selectedGroups = []) {
   const groups = Array.isArray(selectedGroups) ? selectedGroups : [];
   const on = name => groups.includes(name) ? 'active-muscle' : '';
-  return `<svg class="body-map multi-body-map" viewBox="0 0 220 360" aria-label="Mannequin full body musculaire">
+  const front = `<svg class="body-map multi-body-map front-map" viewBox="0 0 220 360" aria-label="Mannequin full body vue de face">
     <circle cx="110" cy="30" r="22"/>
     <path class="body-base" d="M78 58Q110 40 142 58L159 120Q152 143 142 162L139 264H118L111 185L104 264H81L78 162Q68 143 61 120Z"/>
     <path class="body-limb" d="M78 63 51 125 65 134 87 93Z"/>
@@ -485,7 +485,6 @@ function multiGroupBodyMapSVG(selectedGroups = []) {
     <path class="body-limb" d="M137 263 115 263 124 341 146 341Z"/>
 
     <path class="muscle ${on('Pectoraux')}" d="M84 76Q110 62 136 76L128 112Q110 124 92 112Z"/>
-    <path class="muscle ${on('Dos')}" d="M79 84Q87 71 96 76L92 139Q82 145 73 131ZM141 84Q133 71 124 76L128 139Q138 145 147 131Z"/>
     <path class="muscle ${on('Épaules')}" d="M62 66Q73 53 84 59L79 91 60 88ZM136 59Q147 53 158 66L160 88 141 91Z"/>
     <path class="muscle ${on('Bras')}" d="M54 99Q66 94 75 104L69 157Q60 163 50 155ZM145 104Q154 94 166 99L170 155Q160 163 151 157Z"/>
     <path class="muscle ${on('Abdominaux')}" d="M95 118H125L129 170H91Z"/>
@@ -494,6 +493,24 @@ function multiGroupBodyMapSVG(selectedGroups = []) {
     <path class="muscle ${on('Jambes')}" d="M84 197H104L100 268H78ZM116 197H136L142 268H120Z"/>
     <path class="muscle ${on('Jambes')}" d="M78 268H98L93 334H72ZM122 268H142L148 334H127Z"/>
   </svg>`;
+
+  const back = `<svg class="body-map multi-body-map back-map" viewBox="0 0 220 360" aria-label="Mannequin full body vue de dos">
+    <circle cx="110" cy="30" r="22"/>
+    <path class="body-base" d="M78 58Q110 46 142 58L159 122Q150 146 142 164L139 264H118L111 185L104 264H81L78 164Q70 146 61 122Z"/>
+    <path class="body-limb" d="M78 65 51 126 65 134 87 95Z"/>
+    <path class="body-limb" d="M142 65 169 126 155 134 133 95Z"/>
+    <path class="body-limb" d="M83 263 74 341 96 341 105 263Z"/>
+    <path class="body-limb" d="M137 263 115 263 124 341 146 341Z"/>
+
+    <path class="muscle ${on('Dos')}" d="M84 80Q110 63 136 80L140 145Q110 160 80 145Z"/>
+    <path class="muscle ${on('Épaules')}" d="M62 66Q73 54 84 60L79 91 60 88ZM136 60Q147 54 158 66L160 88 141 91Z"/>
+    <path class="muscle ${on('Bras')}" d="M54 100Q66 95 75 104L69 159Q60 165 50 157ZM145 104Q154 95 166 100L170 157Q160 165 151 159Z"/>
+    <path class="muscle ${on('Fessiers')}" d="M84 168Q110 157 136 168L132 198Q110 210 88 198Z"/>
+    <path class="muscle ${on('Jambes')}" d="M84 198H104L100 266H80ZM116 198H136L140 266H120Z"/>
+    <path class="muscle ${on('Jambes')}" d="M78 266H98L93 334H72ZM122 266H142L148 334H127Z"/>
+  </svg>`;
+
+  return `<div class="multi-body-map-stack"><div class="body-map-view"><small>Vue de face</small>${front}</div><div class="body-map-view"><small>Vue de dos</small>${back}</div></div>`;
 }
 function exerciseBelongsToGroup(ex, groupName) {
   return exerciseMatchesFocus(ex, groupName, groupName);
