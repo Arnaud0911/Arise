@@ -1,5 +1,5 @@
-const CACHE = 'arise-v12-atlas-style-159';
-const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192-v3.png','./icons/icon-512-v3.png','./icons/apple-touch-icon-v3.png'];
+const CACHE = 'arise-v13-reference-overlays-160';
+const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192-v3.png','./icons/icon-512-v3.png','./icons/apple-touch-icon-v3.png','./assets/anatomy-front.png','./assets/anatomy-back.png'];
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));

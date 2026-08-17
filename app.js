@@ -475,88 +475,38 @@ function bodyMapSVG(selected = '') {
 
 function multiGroupBodyMapSVG(selectedGroups = []) {
   const groups = Array.isArray(selectedGroups) ? selectedGroups : [];
-  const on = name => groups.includes(name) ? 'active-muscle' : '';
-  const front = `<svg class="body-map multi-body-map front-map anatomical-map atlas-map" viewBox="0 0 280 460" aria-label="Mannequin anatomique vue de face">
-    <g class="atlas-figure">
-      <ellipse class="body-head" cx="140" cy="36" rx="25" ry="29"/>
-      <path class="body-outline" d="M121 62Q140 52 159 62L174 82Q208 95 220 131Q226 150 223 176Q220 200 212 226Q204 253 202 281L195 390Q193 416 188 448H162L160 388Q158 337 154 287H126Q122 337 120 388L118 448H92Q87 416 85 390L78 281Q76 253 68 226Q60 200 57 176Q54 150 60 131Q72 95 106 82Z"/>
-      <path class="body-outline limb" d="M106 84Q84 95 72 119Q55 151 53 194Q52 217 58 243Q63 264 70 277L84 273Q78 251 79 226Q80 188 89 156Q98 121 115 95Z"/>
-      <path class="body-outline limb" d="M174 84Q196 95 208 119Q225 151 227 194Q228 217 222 243Q217 264 210 277L196 273Q202 251 201 226Q200 188 191 156Q182 121 165 95Z"/>
-      <path class="body-outline limb" d="M84 273Q86 301 90 330Q94 361 93 390Q92 421 86 448H62Q64 425 65 403Q67 371 61 335Q56 304 49 282Q43 263 43 245L61 240Q61 262 68 289Q75 317 78 350Q80 311 84 273Z"/>
-      <path class="body-outline limb" d="M196 273Q194 301 190 330Q186 361 187 390Q188 421 194 448H218Q216 425 215 403Q213 371 219 335Q224 304 231 282Q237 263 237 245L219 240Q219 262 212 289Q205 317 202 350Q200 311 196 273Z"/>
-      <path class="body-outline limb" d="M102 390Q97 417 93 448H116Q121 423 126 394L130 355H118Q113 373 102 390Z"/>
-      <path class="body-outline limb" d="M178 390Q183 417 187 448H164Q159 423 154 394L150 355H162Q167 373 178 390Z"/>
-
-      <path class="muscle ${on('Épaules')}" d="M89 90Q102 70 121 74Q124 96 119 116Q102 120 87 111Q83 100 89 90Z"/>
-      <path class="muscle ${on('Épaules')}" d="M191 90Q178 70 159 74Q156 96 161 116Q178 120 193 111Q197 100 191 90Z"/>
-      <path class="muscle ${on('Pectoraux')}" d="M118 88Q129 81 140 82Q151 81 162 88L164 118Q152 133 140 137Q128 133 116 118Z"/>
-      <path class="muscle ${on('Bras')}" d="M73 130Q86 121 98 127Q105 149 103 176Q93 187 79 181Q70 159 73 130Z"/>
-      <path class="muscle ${on('Bras')}" d="M207 130Q194 121 182 127Q175 149 177 176Q187 187 201 181Q210 159 207 130Z"/>
-      <path class="muscle ${on('Bras')}" d="M63 196Q78 188 90 194Q96 217 92 244Q82 255 67 250Q60 228 63 196Z"/>
-      <path class="muscle ${on('Bras')}" d="M217 196Q202 188 190 194Q184 217 188 244Q198 255 213 250Q220 228 217 196Z"/>
-      <path class="muscle ${on('Abdominaux')}" d="M126 139H154L158 240H122Z"/>
-      <path class="muscle ${on('Abdominaux')}" d="M112 144Q120 145 124 150L120 237Q112 238 104 230Z"/>
-      <path class="muscle ${on('Abdominaux')}" d="M168 144Q160 145 156 150L160 237Q168 238 176 230Z"/>
-      <path class="muscle ${on('Fessiers')}" d="M119 239Q140 229 161 239L157 271Q140 281 123 271Z"/>
-      <path class="muscle ${on('Jambes')}" d="M111 272Q124 266 134 273L128 360Q118 372 106 365Q103 327 111 272Z"/>
-      <path class="muscle ${on('Jambes')}" d="M169 272Q156 266 146 273L152 360Q162 372 174 365Q177 327 169 272Z"/>
-      <path class="muscle ${on('Jambes')}" d="M103 363Q115 358 126 366L121 448H95Q94 396 103 363Z"/>
-      <path class="muscle ${on('Jambes')}" d="M177 363Q165 358 154 366L159 448H185Q186 396 177 363Z"/>
-
-      <path class="guide-line" d="M140 10V63M115 34Q140 26 165 34"/>
-      <path class="guide-line" d="M96 92Q112 102 119 116M184 92Q168 102 161 116"/>
-      <path class="guide-line" d="M117 94Q128 101 136 111M163 94Q152 101 144 111"/>
-      <path class="guide-line" d="M119 107Q129 116 136 126M161 107Q151 116 144 126"/>
-      <path class="guide-line" d="M127 145H153M126 164H154M125 183H155M124 202H156M123 221H157"/>
-      <path class="guide-line" d="M112 150Q118 159 120 172M168 150Q162 159 160 172"/>
-      <path class="guide-line" d="M76 132Q86 146 88 167M204 132Q194 146 192 167"/>
-      <path class="guide-line" d="M66 198Q76 214 77 236M214 198Q204 214 203 236"/>
-      <path class="guide-line" d="M112 283Q121 317 118 353M168 283Q159 317 162 353"/>
-      <path class="guide-line" d="M104 372Q110 405 108 438M176 372Q170 405 172 438"/>
-      <path class="guide-line" d="M116 242Q140 251 164 242"/>
-    </g>
-  </svg>`;
-
-  const back = `<svg class="body-map multi-body-map back-map anatomical-map atlas-map" viewBox="0 0 280 460" aria-label="Mannequin anatomique vue de dos">
-    <g class="atlas-figure">
-      <ellipse class="body-head" cx="140" cy="36" rx="25" ry="29"/>
-      <path class="body-outline" d="M121 62Q140 54 159 62L176 85Q206 97 218 132Q224 152 221 177Q218 202 210 226Q202 252 200 281L193 390Q191 416 186 448H162L160 388Q158 338 154 287H126Q122 338 120 388L118 448H94Q89 416 87 390L80 281Q78 252 70 226Q62 202 59 177Q56 152 62 132Q74 97 104 85Z"/>
-      <path class="body-outline limb" d="M104 86Q83 96 71 119Q55 150 53 193Q52 217 58 242Q63 263 70 276L84 272Q78 250 79 225Q80 188 89 156Q98 123 113 97Z"/>
-      <path class="body-outline limb" d="M176 86Q197 96 209 119Q225 150 227 193Q228 217 222 242Q217 263 210 276L196 272Q202 250 201 225Q200 188 191 156Q182 123 167 97Z"/>
-      <path class="body-outline limb" d="M84 272Q86 301 90 330Q94 361 93 390Q92 421 86 448H62Q64 425 65 403Q67 371 61 335Q56 304 49 282Q43 262 43 245L61 240Q61 262 68 289Q75 317 78 350Q80 312 84 272Z"/>
-      <path class="body-outline limb" d="M196 272Q194 301 190 330Q186 361 187 390Q188 421 194 448H218Q216 425 215 403Q213 371 219 335Q224 304 231 282Q237 262 237 245L219 240Q219 262 212 289Q205 317 202 350Q200 312 196 272Z"/>
-      <path class="body-outline limb" d="M102 390Q97 417 93 448H116Q121 423 126 394L130 355H118Q113 373 102 390Z"/>
-      <path class="body-outline limb" d="M178 390Q183 417 187 448H164Q159 423 154 394L150 355H162Q167 373 178 390Z"/>
-
-      <path class="muscle ${on('Épaules')}" d="M89 91Q101 72 120 76Q123 97 118 116Q101 120 87 111Q83 100 89 91Z"/>
-      <path class="muscle ${on('Épaules')}" d="M191 91Q179 72 160 76Q157 97 162 116Q179 120 193 111Q197 100 191 91Z"/>
-      <path class="muscle ${on('Dos')}" d="M120 86Q130 80 140 81Q150 80 160 86L170 145Q156 163 140 170Q124 163 110 145Z"/>
-      <path class="muscle ${on('Dos')}" d="M103 96Q113 91 121 97L117 152Q106 161 94 150Q94 121 103 96Z"/>
-      <path class="muscle ${on('Dos')}" d="M177 96Q167 91 159 97L163 152Q174 161 186 150Q186 121 177 96Z"/>
-      <path class="muscle ${on('Bras')}" d="M73 131Q86 122 98 128Q105 150 103 176Q93 188 79 182Q70 160 73 131Z"/>
-      <path class="muscle ${on('Bras')}" d="M207 131Q194 122 182 128Q175 150 177 176Q187 188 201 182Q210 160 207 131Z"/>
-      <path class="muscle ${on('Bras')}" d="M63 196Q78 189 90 195Q96 218 92 245Q82 256 67 251Q60 229 63 196Z"/>
-      <path class="muscle ${on('Bras')}" d="M217 196Q202 189 190 195Q184 218 188 245Q198 256 213 251Q220 229 217 196Z"/>
-      <path class="muscle ${on('Fessiers')}" d="M118 239Q140 229 162 239L158 273Q140 286 122 273Z"/>
-      <path class="muscle ${on('Jambes')}" d="M110 274Q122 268 131 274L126 357Q117 369 106 363Q103 329 110 274Z"/>
-      <path class="muscle ${on('Jambes')}" d="M170 274Q158 268 149 274L154 357Q163 369 174 363Q177 329 170 274Z"/>
-      <path class="muscle ${on('Jambes')}" d="M103 361Q115 355 126 362L120 448H95Q94 397 103 361Z"/>
-      <path class="muscle ${on('Jambes')}" d="M177 361Q165 355 154 362L160 448H185Q186 397 177 361Z"/>
-
-      <path class="guide-line" d="M140 8V64M116 33Q140 27 164 33"/>
-      <path class="guide-line" d="M140 62V239"/>
-      <path class="guide-line" d="M100 92Q119 111 119 136M180 92Q161 111 161 136"/>
-      <path class="guide-line" d="M110 94Q124 104 130 121M170 94Q156 104 150 121"/>
-      <path class="guide-line" d="M99 113Q114 127 117 150M181 113Q166 127 163 150"/>
-      <path class="guide-line" d="M74 133Q84 147 86 168M206 133Q196 147 194 168"/>
-      <path class="guide-line" d="M66 198Q75 214 76 237M214 198Q205 214 204 237"/>
-      <path class="guide-line" d="M118 242Q128 252 132 267M162 242Q152 252 148 267"/>
-      <path class="guide-line" d="M112 285Q119 319 117 353M168 285Q161 319 163 353"/>
-      <path class="guide-line" d="M104 372Q110 405 108 438M176 372Q170 405 172 438"/>
-    </g>
-  </svg>`;
-
-  return `<div class="multi-body-map-stack"><div class="body-map-view"><small>Vue de face</small>${front}</div><div class="body-map-view"><small>Vue de dos</small>${back}</div></div>`;
+  const on = name => groups.includes(name);
+  const frontOverlay = `
+    ${on('Épaules') ? '<ellipse class="highlight-zone" cx="338" cy="356" rx="98" ry="120" transform="rotate(-14 338 356)"/><ellipse class="highlight-zone" cx="784" cy="356" rx="98" ry="120" transform="rotate(14 784 356)"/>' : ''}
+    ${on('Pectoraux') ? '<ellipse class="highlight-zone" cx="448" cy="466" rx="156" ry="102" transform="rotate(-8 448 466)"/><ellipse class="highlight-zone" cx="674" cy="466" rx="156" ry="102" transform="rotate(8 674 466)"/>' : ''}
+    ${on('Bras') ? '<ellipse class="highlight-zone" cx="286" cy="560" rx="90" ry="168" transform="rotate(8 286 560)"/><ellipse class="highlight-zone" cx="832" cy="560" rx="90" ry="168" transform="rotate(-8 832 560)"/><ellipse class="highlight-zone" cx="257" cy="806" rx="74" ry="154" transform="rotate(6 257 806)"/><ellipse class="highlight-zone" cx="861" cy="806" rx="74" ry="154" transform="rotate(-6 861 806)"/>' : ''}
+    ${on('Abdominaux') ? '<rect class="highlight-zone" x="476" y="458" width="170" height="356" rx="70"/><path class="highlight-zone" d="M420 520C451 486 474 485 486 528L477 803C447 792 424 760 414 706C403 646 401 574 420 520Z"/><path class="highlight-zone" d="M702 520C671 486 648 485 636 528L645 803C675 792 698 760 708 706C719 646 721 574 702 520Z"/>' : ''}
+    ${on('Fessiers') ? '<ellipse class="highlight-zone subtle-zone" cx="470" cy="808" rx="88" ry="70" transform="rotate(-22 470 808)"/><ellipse class="highlight-zone subtle-zone" cx="650" cy="808" rx="88" ry="70" transform="rotate(22 650 808)"/>' : ''}
+    ${on('Jambes') ? '<ellipse class="highlight-zone" cx="448" cy="980" rx="122" ry="224" transform="rotate(4 448 980)"/><ellipse class="highlight-zone" cx="674" cy="980" rx="122" ry="224" transform="rotate(-4 674 980)"/><ellipse class="highlight-zone" cx="422" cy="1226" rx="92" ry="168"/><ellipse class="highlight-zone" cx="700" cy="1226" rx="92" ry="168"/>' : ''}
+  `;
+  const backOverlay = `
+    ${on('Épaules') ? '<ellipse class="highlight-zone" cx="338" cy="356" rx="102" ry="124" transform="rotate(-12 338 356)"/><ellipse class="highlight-zone" cx="784" cy="356" rx="102" ry="124" transform="rotate(12 784 356)"/>' : ''}
+    ${on('Dos') ? '<path class="highlight-zone" d="M374 336C436 262 534 239 561 238C588 239 686 262 748 336C786 381 800 460 784 535C767 620 724 700 676 767C649 805 612 834 561 846C510 834 473 805 446 767C398 700 355 620 338 535C322 460 336 381 374 336Z"/><ellipse class="highlight-zone" cx="430" cy="504" rx="104" ry="196" transform="rotate(8 430 504)"/><ellipse class="highlight-zone" cx="692" cy="504" rx="104" ry="196" transform="rotate(-8 692 504)"/>' : ''}
+    ${on('Bras') ? '<ellipse class="highlight-zone" cx="286" cy="562" rx="90" ry="168" transform="rotate(8 286 562)"/><ellipse class="highlight-zone" cx="832" cy="562" rx="90" ry="168" transform="rotate(-8 832 562)"/><ellipse class="highlight-zone" cx="257" cy="808" rx="74" ry="154" transform="rotate(6 257 808)"/><ellipse class="highlight-zone" cx="861" cy="808" rx="74" ry="154" transform="rotate(-6 861 808)"/>' : ''}
+    ${on('Fessiers') ? '<ellipse class="highlight-zone" cx="474" cy="855" rx="118" ry="112" transform="rotate(-12 474 855)"/><ellipse class="highlight-zone" cx="648" cy="855" rx="118" ry="112" transform="rotate(12 648 855)"/>' : ''}
+    ${on('Jambes') ? '<ellipse class="highlight-zone" cx="454" cy="1004" rx="118" ry="214" transform="rotate(4 454 1004)"/><ellipse class="highlight-zone" cx="668" cy="1004" rx="118" ry="214" transform="rotate(-4 668 1004)"/><ellipse class="highlight-zone" cx="430" cy="1218" rx="92" ry="170"/><ellipse class="highlight-zone" cx="692" cy="1218" rx="92" ry="170"/>' : ''}
+  `;
+  return `<div class="multi-body-map-stack ref-body-stack">
+    <div class="body-map-view ref-body-view">
+      <small>Vue de face</small>
+      <div class="ref-body-canvas">
+        <img src="assets/anatomy-front.png" alt="Schéma musculaire vue de face" class="ref-body-image"/>
+        <svg class="ref-overlay" viewBox="0 0 1122 1402" aria-hidden="true">${frontOverlay}</svg>
+      </div>
+    </div>
+    <div class="body-map-view ref-body-view">
+      <small>Vue de dos</small>
+      <div class="ref-body-canvas">
+        <img src="assets/anatomy-back.png" alt="Schéma musculaire vue de dos" class="ref-body-image"/>
+        <svg class="ref-overlay" viewBox="0 0 1122 1402" aria-hidden="true">${backOverlay}</svg>
+      </div>
+    </div>
+  </div>`;
 }
 function exerciseBelongsToGroup(ex, groupName) {
   return exerciseMatchesFocus(ex, groupName, groupName);
