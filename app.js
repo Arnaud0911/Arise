@@ -49,23 +49,27 @@ function sessionDateKey(session) { return session.dateKey || localDateKey(sessio
 function clamp(value, min = 0, max = 100) { return Math.max(min, Math.min(max, Number(value) || 0)); }
 function initialState() {
   return {
-    version: 2,
+    version: 3,
+    profile: { firstName: '', weightKg: 0, heightCm: 0, birthYear: '', sex: '' },
     goals: { calories: 2400, protein: 160, sleep: 8 },
+    performanceGoals: { Force: 70, Puissance: 70, Vitesse: 70, Endurance: 70, Mobilité: 70, Régularité: 70 },
+    performanceTests: [],
     workouts: clone(DEFAULT_WORKOUTS), sessions: [], meals: [], recoveryLogs: {},
     habits: [
       { id: uid(), name: 'Boire 2 L d’eau', target: 'Tous les jours', checks: {} },
       { id: uid(), name: '10 minutes de mobilité', target: 'Tous les jours', checks: {} }
-    ],
-    radar: { Force: 55, Puissance: 45, Vitesse: 50, Endurance: 60, Mobilité: 40, Régularité: 55 }
+    ]
   };
 }
 function normalizeState(parsed) {
   const base = initialState();
   const source = parsed && typeof parsed === 'object' ? parsed : {};
   return {
-    ...base, ...source, version: 2,
+    ...base, ...source, version: 3,
+    profile: { ...base.profile, ...(source.profile || {}) },
     goals: { ...base.goals, ...(source.goals || {}) },
-    radar: { ...base.radar, ...(source.radar || {}) },
+    performanceGoals: { ...base.performanceGoals, ...(source.performanceGoals || {}) },
+    performanceTests: Array.isArray(source.performanceTests) ? source.performanceTests : [],
     recoveryLogs: source.recoveryLogs || {},
     workouts: Array.isArray(source.workouts) ? source.workouts : base.workouts,
     sessions: Array.isArray(source.sessions) ? source.sessions : [],
@@ -210,7 +214,43 @@ function scoreLabel(score) {
   if (score < 80) return 'Très bon rythme';
   return 'Excellent';
 }
+
+function profileInitials() {
+  const name = String(state.profile?.firstName || '').trim();
+  return (name ? name.slice(0,2) : 'A').toUpperCase();
+}
+function renderProfile() {
+  const p = state.profile || {};
+  const firstName = (p.firstName || 'Utilisateur').trim();
+  const initials = profileInitials();
+  const homeName = document.getElementById('home-first-name'); if (homeName) homeName.textContent = firstName.toUpperCase();
+  const topAvatar = document.getElementById('top-avatar-initials'); if (topAvatar) topAvatar.textContent = initials;
+  const avatar = document.getElementById('profile-avatar'); if (avatar) avatar.textContent = initials;
+  const profileName = document.getElementById('profile-name'); if (profileName) profileName.textContent = p.firstName || 'Mon profil';
+  const meta = document.getElementById('profile-meta'); if (meta) {
+    const parts = [];
+    if (p.weightKg) parts.push(`${formatNumber(p.weightKg,1)} kg`);
+    if (p.heightCm) parts.push(`${formatNumber(p.heightCm)} cm`);
+    if (p.birthYear) parts.push(`${new Date().getFullYear()-Number(p.birthYear)} ans`);
+    meta.textContent = parts.length ? parts.join(' · ') : 'Configure ton profil pour personnaliser Arise.';
+  }
+}
+function openProfileForm(firstSetup = false) {
+  const p = state.profile || {};
+  modal(`<h2>${firstSetup ? 'Bienvenue dans Arise' : 'Modifier mon profil'}</h2><p class="muted">Ce profil est enregistré uniquement sur cet appareil. Tes amis auront chacun leur propre profil sur leur téléphone.</p><label>Prénom<input id="profile-firstname" value="${escapeHtml(p.firstName || '')}" placeholder="Ex. Arnaud" autocomplete="given-name"></label><div class="fields"><label>Poids (kg)<input id="profile-weight" type="number" min="30" max="300" step="0.1" value="${p.weightKg || ''}" placeholder="80"></label><label>Taille (cm)<input id="profile-height" type="number" min="120" max="230" step="1" value="${p.heightCm || ''}" placeholder="180"></label></div><div class="fields"><label>Année de naissance<input id="profile-birthyear" type="number" min="1920" max="${new Date().getFullYear()}" step="1" value="${escapeHtml(p.birthYear || '')}" placeholder="2002"></label><label>Référence sportive<select id="profile-sex"><option value="" ${!p.sex?'selected':''}>Ne pas préciser</option><option value="Homme" ${p.sex==='Homme'?'selected':''}>Homme</option><option value="Femme" ${p.sex==='Femme'?'selected':''}>Femme</option></select></label></div><div class="modal-actions">${firstSetup ? '' : '<button type="button" class="secondary" id="cancel-modal">Annuler</button>'}<button type="button" class="primary" id="save-profile">Enregistrer</button></div>`, 'profile-modal');
+  document.getElementById('cancel-modal')?.addEventListener('click', closeModal);
+  document.getElementById('save-profile').onclick = () => {
+    const firstName = document.getElementById('profile-firstname').value.trim(); if (!firstName) return toast('Entre ton prénom');
+    state.profile = { firstName, weightKg: Number(document.getElementById('profile-weight').value || 0), heightCm: Number(document.getElementById('profile-height').value || 0), birthYear: document.getElementById('profile-birthyear').value || '', sex: document.getElementById('profile-sex').value || '' };
+    saveState(); closeModal(); renderAll(); toast('Profil enregistré');
+  };
+}
+function maybePromptProfile() {
+  if (!state.profile?.firstName) setTimeout(() => openProfileForm(true), 350);
+}
+
 function renderHome() {
+  renderProfile();
   const now = new Date(); const data = dailyScore();
   document.getElementById('home-day').textContent = now.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '').toUpperCase();
   document.getElementById('home-date').textContent = String(now.getDate()).padStart(2, '0');
@@ -346,7 +386,7 @@ function finishSession(workout) {
   const rows = [...document.querySelectorAll('[data-session-row]')].map((row, i) => { const data = {}; row.querySelectorAll('[data-sfield]').forEach(inp => data[inp.dataset.sfield] = Number(inp.value)); return { name: workout.exercises[i].name, ...data }; });
   const volume = rows.reduce((sum, e) => sum + e.sets * e.reps * e.load, 0);
   state.sessions.push({ id: uid(), workoutId: workout.id, workoutName: workout.name, date: new Date().toISOString(), dateKey: TODAY(), rows, volume, note: document.getElementById('session-note').value.trim() });
-  state.radar.Régularité = clamp(Math.round(sessionsInLastDays(28).length / 12 * 100)); saveState(); closeModal(); renderAll(); toast(`Séance enregistrée · ${formatNumber(volume)} kg`);
+  saveState(); closeModal(); renderAll(); toast(`Séance enregistrée · ${formatNumber(volume)} kg`);
 }
 
 
@@ -481,32 +521,16 @@ function multiGroupBodyMapSVG(selectedGroups = []) {
     ${on('Pectoraux') ? '<ellipse class="highlight-zone" cx="448" cy="466" rx="156" ry="102" transform="rotate(-8 448 466)"/><ellipse class="highlight-zone" cx="674" cy="466" rx="156" ry="102" transform="rotate(8 674 466)"/>' : ''}
     ${on('Bras') ? '<ellipse class="highlight-zone" cx="286" cy="560" rx="90" ry="168" transform="rotate(8 286 560)"/><ellipse class="highlight-zone" cx="832" cy="560" rx="90" ry="168" transform="rotate(-8 832 560)"/><ellipse class="highlight-zone" cx="257" cy="806" rx="74" ry="154" transform="rotate(6 257 806)"/><ellipse class="highlight-zone" cx="861" cy="806" rx="74" ry="154" transform="rotate(-6 861 806)"/>' : ''}
     ${on('Abdominaux') ? '<rect class="highlight-zone" x="476" y="458" width="170" height="356" rx="70"/><path class="highlight-zone" d="M420 520C451 486 474 485 486 528L477 803C447 792 424 760 414 706C403 646 401 574 420 520Z"/><path class="highlight-zone" d="M702 520C671 486 648 485 636 528L645 803C675 792 698 760 708 706C719 646 721 574 702 520Z"/>' : ''}
-    ${on('Fessiers') ? '<ellipse class="highlight-zone subtle-zone" cx="470" cy="808" rx="88" ry="70" transform="rotate(-22 470 808)"/><ellipse class="highlight-zone subtle-zone" cx="650" cy="808" rx="88" ry="70" transform="rotate(22 650 808)"/>' : ''}
     ${on('Jambes') ? '<ellipse class="highlight-zone" cx="448" cy="980" rx="122" ry="224" transform="rotate(4 448 980)"/><ellipse class="highlight-zone" cx="674" cy="980" rx="122" ry="224" transform="rotate(-4 674 980)"/><ellipse class="highlight-zone" cx="422" cy="1226" rx="92" ry="168"/><ellipse class="highlight-zone" cx="700" cy="1226" rx="92" ry="168"/>' : ''}
   `;
   const backOverlay = `
     ${on('Épaules') ? '<ellipse class="highlight-zone" cx="338" cy="356" rx="102" ry="124" transform="rotate(-12 338 356)"/><ellipse class="highlight-zone" cx="784" cy="356" rx="102" ry="124" transform="rotate(12 784 356)"/>' : ''}
-    ${on('Dos') ? '<path class="highlight-zone" d="M374 336C436 262 534 239 561 238C588 239 686 262 748 336C786 381 800 460 784 535C767 620 724 700 676 767C649 805 612 834 561 846C510 834 473 805 446 767C398 700 355 620 338 535C322 460 336 381 374 336Z"/><ellipse class="highlight-zone" cx="430" cy="504" rx="104" ry="196" transform="rotate(8 430 504)"/><ellipse class="highlight-zone" cx="692" cy="504" rx="104" ry="196" transform="rotate(-8 692 504)"/>' : ''}
+    ${on('Dos') ? '<path class="highlight-zone" d="M374 336C436 262 534 239 561 238C588 239 686 262 748 336C786 381 800 460 784 535C767 620 724 700 676 767C649 805 612 834 561 846C510 834 473 805 446 767C398 700 355 620 338 535C322 460 336 381 374 336Z"/>' : ''}
     ${on('Bras') ? '<ellipse class="highlight-zone" cx="286" cy="562" rx="90" ry="168" transform="rotate(8 286 562)"/><ellipse class="highlight-zone" cx="832" cy="562" rx="90" ry="168" transform="rotate(-8 832 562)"/><ellipse class="highlight-zone" cx="257" cy="808" rx="74" ry="154" transform="rotate(6 257 808)"/><ellipse class="highlight-zone" cx="861" cy="808" rx="74" ry="154" transform="rotate(-6 861 808)"/>' : ''}
     ${on('Fessiers') ? '<ellipse class="highlight-zone" cx="474" cy="855" rx="118" ry="112" transform="rotate(-12 474 855)"/><ellipse class="highlight-zone" cx="648" cy="855" rx="118" ry="112" transform="rotate(12 648 855)"/>' : ''}
     ${on('Jambes') ? '<ellipse class="highlight-zone" cx="454" cy="1004" rx="118" ry="214" transform="rotate(4 454 1004)"/><ellipse class="highlight-zone" cx="668" cy="1004" rx="118" ry="214" transform="rotate(-4 668 1004)"/><ellipse class="highlight-zone" cx="430" cy="1218" rx="92" ry="170"/><ellipse class="highlight-zone" cx="692" cy="1218" rx="92" ry="170"/>' : ''}
   `;
-  return `<div class="multi-body-map-stack ref-body-stack">
-    <div class="body-map-view ref-body-view">
-      <small>Vue de face</small>
-      <div class="ref-body-canvas">
-        <img src="assets/anatomy-front.png" alt="Schéma musculaire vue de face" class="ref-body-image"/>
-        <svg class="ref-overlay" viewBox="0 0 1122 1402" aria-hidden="true">${frontOverlay}</svg>
-      </div>
-    </div>
-    <div class="body-map-view ref-body-view">
-      <small>Vue de dos</small>
-      <div class="ref-body-canvas">
-        <img src="assets/anatomy-back.png" alt="Schéma musculaire vue de dos" class="ref-body-image"/>
-        <svg class="ref-overlay" viewBox="0 0 1122 1402" aria-hidden="true">${backOverlay}</svg>
-      </div>
-    </div>
-  </div>`;
+  return `<div class="multi-body-map-stack ref-body-stack"><div class="body-map-view ref-body-view"><small>Vue de face</small><div class="ref-body-canvas"><img src="assets/anatomy-front.png" alt="Schéma musculaire vue de face" class="ref-body-image"/><svg class="ref-overlay" viewBox="0 0 1122 1402" aria-hidden="true">${frontOverlay}</svg></div></div><div class="body-map-view ref-body-view"><small>Vue de dos</small><div class="ref-body-canvas"><img src="assets/anatomy-back.png" alt="Schéma musculaire vue de dos" class="ref-body-image"/><svg class="ref-overlay" viewBox="0 0 1122 1402" aria-hidden="true">${backOverlay}</svg></div></div></div>`;
 }
 function exerciseBelongsToGroup(ex, groupName) {
   return exerciseMatchesFocus(ex, groupName, groupName);
@@ -741,20 +765,37 @@ function setScanStatus(text, type = '') {
   status.className = `scan-status ${type}`.trim(); status.querySelector('span').textContent = text;
 }
 async function startAutomaticScanner() {
-  if (!window.Html5Qrcode) {
-    setScanStatus('Le module de scan n’a pas chargé. Saisis le numéro manuellement.', 'error'); return;
+  // Priorité au lecteur embarqué Html5Qrcode (fonctionne bien sur Safari iOS en HTTPS).
+  if (window.Html5Qrcode) {
+    try {
+      const formats = [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128];
+      html5Scanner = new Html5Qrcode('qr-reader', { formatsToSupport: formats, verbose: false });
+      await html5Scanner.start({ facingMode: 'environment' }, { fps: 12, qrbox: (w, h) => ({ width: Math.min(w * .88, 360), height: Math.min(h * .34, 145) }), aspectRatio: 1.6 }, async decodedText => {
+        const code = String(decodedText || '').replace(/\D/g,''); if (!/^\d{8,14}$/.test(code)) return;
+        setScanStatus(`Produit détecté : ${code}`, 'success'); await stopCamera(); lookupBarcode(code);
+      }, () => {});
+      setScanStatus('Caméra active — place le code-barres dans le cadre', 'active');
+      return;
+    } catch {}
   }
-  try {
-    const formats = [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E, Html5QrcodeSupportedFormats.CODE_128];
-    html5Scanner = new Html5Qrcode('qr-reader', { formatsToSupport: formats, verbose: false });
-    await html5Scanner.start({ facingMode: 'environment' }, { fps: 12, qrbox: (w, h) => ({ width: Math.min(w * .86, 330), height: Math.min(h * .34, 130) }), aspectRatio: 1.6 }, async decodedText => {
-      if (!/^\d{8,14}$/.test(decodedText)) return;
-      setScanStatus(`Produit détecté : ${decodedText}`, 'success'); await stopCamera(); lookupBarcode(decodedText);
-    }, () => {});
-    setScanStatus('Caméra active — vise le code-barres', 'active');
-  } catch {
-    setScanStatus('Caméra refusée ou indisponible. Utilise la photo ou la saisie manuelle.', 'error');
+  // Secours natif si BarcodeDetector est disponible sur l'appareil.
+  if ('BarcodeDetector' in window && navigator.mediaDevices?.getUserMedia) {
+    try {
+      const root = document.getElementById('qr-reader'); root.innerHTML = '<video id="native-barcode-video" autoplay muted playsinline></video>';
+      const video = document.getElementById('native-barcode-video');
+      activeStream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } });
+      video.srcObject = activeStream; await video.play();
+      const detector = new BarcodeDetector({ formats:['ean_13','ean_8','upc_a','upc_e','code_128'] });
+      setScanStatus('Caméra active — place le code-barres dans le cadre', 'active');
+      const loop = async () => {
+        if (!activeStream || !document.getElementById('native-barcode-video')) return;
+        try { const found = await detector.detect(video); const raw = found?.[0]?.rawValue || ''; const code = raw.replace(/\D/g,''); if (/^\d{8,14}$/.test(code)) { setScanStatus(`Produit détecté : ${code}`, 'success'); await stopCamera(); lookupBarcode(code); return; } } catch {}
+        requestAnimationFrame(loop);
+      };
+      requestAnimationFrame(loop); return;
+    } catch {}
   }
+  setScanStatus('Impossible d’ouvrir la caméra. Autorise-la dans Safari ou utilise la photo / saisie manuelle.', 'error');
 }
 async function scanBarcodeFile(file) {
   if (!window.Html5Qrcode) return toast('Module de scan indisponible');
@@ -812,8 +853,138 @@ function nutritionVerdict(p) {
   return `Points positifs : ${positives.join(', ')}. À surveiller : ${alerts.join(', ')}.`;
 }
 
+
+const PERFORMANCE_LABELS = ['Force', 'Puissance', 'Vitesse', 'Endurance', 'Mobilité', 'Régularité'];
+const PERFORMANCE_TEST_TYPES = {
+  bench: { label: 'Développé couché', category: 'Force', unit: 'kg', strength: true },
+  squat: { label: 'Squat', category: 'Force', unit: 'kg', strength: true },
+  deadlift: { label: 'Soulevé de terre', category: 'Force', unit: 'kg', strength: true },
+  sprint100: { label: 'Sprint 100 m', category: 'Vitesse', unit: 's' },
+  run5k: { label: 'Course 5 km', category: 'Endurance', unit: 'min' },
+  marathon: { label: 'Marathon', category: 'Endurance', unit: 'min' },
+  verticalJump: { label: 'Saut vertical', category: 'Puissance', unit: 'cm' },
+  sitReach: { label: 'Sit & reach', category: 'Mobilité', unit: 'cm' }
+};
+function recentTests(days = 365) {
+  const cutoff = Date.now() - days * 86400000;
+  return (state.performanceTests || []).filter(t => new Date(t.date || 0).getTime() >= cutoff);
+}
+function latestTest(type) {
+  return recentTests().filter(t => t.type === type).sort((a,b) => new Date(b.date) - new Date(a.date))[0] || null;
+}
+function epley1RM(load, reps) {
+  const w = Math.max(0, Number(load || 0)); const r = Math.max(1, Number(reps || 1));
+  return w * (1 + Math.min(r, 30) / 30);
+}
+function scoreLinear(value, low, elite, lowerIsBetter = false) {
+  if (!Number.isFinite(value)) return 0;
+  if (lowerIsBetter) return clamp((low - value) / (low - elite) * 100);
+  return clamp((value - low) / (elite - low) * 100);
+}
+function strengthExerciseKey(name = '') {
+  const n = name.toLowerCase();
+  if (n.includes('développé couché') || n.includes('bench')) return 'bench';
+  if (n.includes('squat') && !n.includes('split')) return 'squat';
+  if (n.includes('soulevé de terre') || n.includes('deadlift')) return 'deadlift';
+  if (n.includes('développé militaire')) return 'ohp';
+  if (n.includes('rowing')) return 'row';
+  return '';
+}
+function bestStrengthRatio() {
+  const bw = Math.max(35, Number(state.profile?.weightKg || 80));
+  const eliteRatio = { bench: 2.5, squat: 3.5, deadlift: 4.0, ohp: 1.65, row: 2.25 };
+  let best = 0;
+  const recentSessions = state.sessions.filter(s => Date.now() - new Date(s.date).getTime() <= 180 * 86400000).slice(-60);
+  recentSessions.forEach(session => (session.rows || []).forEach(row => {
+    const key = strengthExerciseKey(row.name); if (!key || !Number(row.load)) return;
+    const ratio = epley1RM(row.load, row.reps) / bw;
+    best = Math.max(best, clamp(ratio / eliteRatio[key] * 100));
+  }));
+  ['bench','squat','deadlift'].forEach(type => {
+    const t = latestTest(type); if (!t) return;
+    const ratio = epley1RM(t.value, t.reps || 1) / bw;
+    best = Math.max(best, clamp(ratio / eliteRatio[type] * 100));
+  });
+  return Math.round(best);
+}
+function sessionsContaining(words, days = 28) {
+  const since = Date.now() - days * 86400000;
+  const terms = words.map(x => x.toLowerCase());
+  return state.sessions.filter(s => new Date(s.date).getTime() >= since && (s.rows || []).some(r => terms.some(t => String(r.name || '').toLowerCase().includes(t))));
+}
+function performanceScores() {
+  const force = bestStrengthRatio();
+  const sex = String(state.profile?.sex || '').toLowerCase();
+  const sprintWR = sex === 'femme' ? 10.49 : 9.58;
+  const marathonWR = sex === 'femme' ? 129.93 : 120.583;
+
+  const jump = latestTest('verticalJump');
+  const powerTraining = sessionsContaining(['box jump','sauts verticaux','sprint'], 28).length;
+  const power = jump ? Math.round(scoreLinear(Number(jump.value), 15, sex === 'femme' ? 85 : 110)) : Math.min(60, powerTraining * 15);
+
+  const sprint = latestTest('sprint100');
+  const speedTraining = sessionsContaining(['sprint'], 28).length;
+  const speed = sprint ? Math.round(scoreLinear(Number(sprint.value), 25, sprintWR, true)) : Math.min(55, speedTraining * 14);
+
+  const marathon = latestTest('marathon'); const run5k = latestTest('run5k');
+  const cardioSessions = sessionsContaining(['course','vélo','rameur','corde à sauter','burpees','mountain climbers'], 28).length;
+  let endurance = Math.min(60, cardioSessions * 9);
+  if (run5k) endurance = Math.max(endurance, Math.round(scoreLinear(Number(run5k.value), 45, sex === 'femme' ? 14.0 : 12.5, true)));
+  if (marathon) endurance = Math.max(endurance, Math.round(scoreLinear(Number(marathon.value), 360, marathonWR, true)));
+
+  const sitReach = latestTest('sitReach');
+  const mobilitySessions = sessionsContaining(['mobilité','étirement','deep squat'], 28).length;
+  const mobilityHabits = state.habits.filter(h => /mobil|stretch|étir|yoga/i.test(h.name || '')).reduce((sum,h) => sum + Object.entries(h.checks || {}).filter(([d,v]) => v && Date.now() - new Date(`${d}T12:00:00`).getTime() <= 28*86400000).length, 0);
+  let mobility = Math.min(65, mobilitySessions * 12 + mobilityHabits * 3);
+  if (sitReach) mobility = Math.max(mobility, Math.round(scoreLinear(Number(sitReach.value), -10, 35)));
+
+  const days = Array.from({length:28},(_,i)=>{const d=new Date();d.setDate(d.getDate()-i);return localDateKey(d);});
+  const activeTrainingDays = new Set(state.sessions.filter(s => days.includes(sessionDateKey(s))).map(sessionDateKey)).size;
+  const trainingRegularity = clamp(activeTrainingDays / 12 * 100);
+  const habitPossible = Math.max(1, state.habits.length * 28);
+  const habitDone = state.habits.reduce((sum,h) => sum + days.filter(d => h.checks?.[d]).length, 0);
+  const habitRegularity = clamp(habitDone / habitPossible * 100);
+  const regularity = Math.round(trainingRegularity * .65 + habitRegularity * .35);
+
+  return { Force: force, Puissance: power, Vitesse: speed, Endurance: endurance, Mobilité: mobility, Régularité: regularity };
+}
+function performanceSourceSummary() {
+  const scores = performanceScores();
+  const items = PERFORMANCE_LABELS.map(label => `<div><span>${label}</span><b>${scores[label]}</b><small>/100</small></div>`).join('');
+  const note = state.profile?.weightKg ? '' : '<p class="performance-warning">Ajoute ton poids dans ton profil pour rendre le score de force plus précis.</p>';
+  return `${items}${note}`;
+}
+function renderPerformanceTests() {
+  const root = document.getElementById('performance-tests'); if (!root) return;
+  const tests = (state.performanceTests || []).slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6);
+  root.innerHTML = tests.length ? tests.map(t => {
+    const meta = PERFORMANCE_TEST_TYPES[t.type] || {label:t.type,unit:''};
+    const value = meta.strength ? `${formatNumber(t.value,1)} kg × ${t.reps || 1}` : `${formatNumber(t.value,2)} ${meta.unit}`;
+    return `<div class="performance-test-row"><span><b>${escapeHtml(meta.label)}</b><small>${value} · ${new Date(t.date).toLocaleDateString('fr-FR')}</small></span><button class="icon-action danger-icon" data-delete-test="${t.id}" aria-label="Supprimer"><svg><use href="#i-trash"/></svg></button></div>`;
+  }).join('') : '<div class="performance-empty">Aucun test manuel. Arise utilise déjà tes séances récentes quand elles contiennent des données exploitables.</div>';
+  root.querySelectorAll('[data-delete-test]').forEach(btn => btn.onclick = () => {
+    const t = state.performanceTests.find(x => x.id === btn.dataset.deleteTest);
+    confirmDelete('Supprimer ce test ?', `${PERFORMANCE_TEST_TYPES[t?.type]?.label || 'Ce test'} sera retiré du calcul.`, () => {
+      state.performanceTests = state.performanceTests.filter(x => x.id !== btn.dataset.deleteTest); saveState(); renderTracking();
+    });
+  });
+}
+function openPerformanceTestForm() {
+  const options = Object.entries(PERFORMANCE_TEST_TYPES).map(([id,m]) => `<option value="${id}">${m.label}</option>`).join('');
+  modal(`<h2>Ajouter une performance</h2><p class="muted">Arise utilisera cette mesure avec tes séances récentes pour mettre à jour automatiquement ton radar.</p><label>Test<select id="perf-test-type">${options}</select></label><div id="perf-test-fields"></div><div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-performance-test">Ajouter</button></div>`);
+  const select = document.getElementById('perf-test-type'); const fields = document.getElementById('perf-test-fields');
+  const renderFields = () => { const meta = PERFORMANCE_TEST_TYPES[select.value]; fields.innerHTML = `<label>${meta.label} (${meta.unit})<input id="perf-test-value" type="number" min="0" step="0.01" placeholder="Valeur"></label>${meta.strength ? '<label>Répétitions<input id="perf-test-reps" type="number" min="1" max="50" value="1"></label>' : ''}`; };
+  select.onchange = renderFields; renderFields(); document.getElementById('cancel-modal').onclick = closeModal;
+  document.getElementById('save-performance-test').onclick = () => {
+    const value = Number(document.getElementById('perf-test-value')?.value); if (!(value > 0)) return toast('Entre une valeur valide');
+    const meta = PERFORMANCE_TEST_TYPES[select.value]; state.performanceTests.push({ id: uid(), type: select.value, value, reps: meta.strength ? Math.max(1, Number(document.getElementById('perf-test-reps')?.value || 1)) : 0, date: new Date().toISOString() });
+    saveState(); closeModal(); renderTracking(); toast('Performance ajoutée');
+  };
+}
 function renderTracking() {
   renderRecovery();
+  const summary = document.getElementById('performance-summary'); if (summary) summary.innerHTML = performanceSourceSummary();
+  renderPerformanceTests();
   const today = TODAY(); const root = document.getElementById('habit-list');
   root.innerHTML = state.habits.length ? state.habits.map(h => { const done = !!h.checks?.[today]; const completed = Object.values(h.checks || {}).filter(Boolean).length; return `<article class="habit-card"><div class="habit-info"><b>${escapeHtml(h.name)}</b><small>${escapeHtml(h.target)} · ${completed} validations</small></div><div class="habit-actions"><button class="icon-action" data-edit-habit="${h.id}" aria-label="Modifier"><svg><use href="#i-edit"/></svg></button><button class="icon-action danger-icon" data-delete-habit="${h.id}" aria-label="Supprimer"><svg><use href="#i-trash"/></svg></button><button class="habit-check ${done ? 'done' : ''}" data-check-habit="${h.id}">✓</button></div></article>`; }).join('') : '<div class="empty">Ajoute ta première habitude.</div>';
   root.querySelectorAll('[data-check-habit]').forEach(btn => btn.onclick = () => { const h = state.habits.find(x => x.id === btn.dataset.checkHabit); h.checks[today] = !h.checks[today]; saveState(); renderAll(); });
@@ -839,9 +1010,10 @@ function openRecoveryForm(prefill = state.recoveryLogs[TODAY()] || {}) {
   document.getElementById('save-recovery').onclick = () => { state.recoveryLogs[TODAY()] = { sleepHours: Number(slider.value), quality: Number(document.getElementById('sleep-quality').value), energy: Number(document.getElementById('energy-level').value), note: document.getElementById('recovery-note').value.trim() }; saveState(); closeModal(); renderAll(); toast('Repos enregistré'); };
 }
 function editRadar() {
-  modal(`<h2>Profil sportif</h2><p class="muted">Attribue une valeur de 0 à 100.</p>${Object.entries(state.radar).map(([k, v]) => `<label>${k} — <span id="radar-val-${k}">${v}</span><input type="range" min="0" max="100" value="${v}" data-radar="${k}"></label>`).join('')}<div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-radar">Enregistrer</button></div>`);
-  document.querySelectorAll('[data-radar]').forEach(r => r.oninput = () => document.getElementById(`radar-val-${r.dataset.radar}`).textContent = r.value);
-  document.getElementById('cancel-modal').onclick = closeModal; document.getElementById('save-radar').onclick = () => { document.querySelectorAll('[data-radar]').forEach(r => state.radar[r.dataset.radar] = +r.value); saveState(); closeModal(); drawAllCharts(); };
+  modal(`<h2>Objectifs de performance</h2><p class="muted">Définis la zone que tu aimerais atteindre. La courbe violette restera affichée avec ton niveau estimé actuel.</p>${PERFORMANCE_LABELS.map(k => `<label>${k} — <span id="radar-val-${k}">${state.performanceGoals[k] ?? 70}</span><input type="range" min="0" max="100" value="${state.performanceGoals[k] ?? 70}" data-radar-goal="${k}"></label>`).join('')}<div class="modal-actions"><button type="button" class="secondary" id="cancel-modal">Annuler</button><button type="button" class="primary" id="save-radar">Enregistrer</button></div>`);
+  document.querySelectorAll('[data-radar-goal]').forEach(r => r.oninput = () => document.getElementById(`radar-val-${r.dataset.radarGoal}`).textContent = r.value);
+  document.getElementById('cancel-modal').onclick = closeModal;
+  document.getElementById('save-radar').onclick = () => { document.querySelectorAll('[data-radar-goal]').forEach(r => state.performanceGoals[r.dataset.radarGoal] = +r.value); saveState(); closeModal(); drawAllCharts(); };
 }
 
 function canvasSetup(canvas) {
@@ -849,11 +1021,23 @@ function canvasSetup(canvas) {
   canvas.width = cssW * dpr; canvas.height = cssH * dpr; canvas.style.height = `${cssH}px`; const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w: cssW, h: cssH };
 }
 function drawRadar() {
-  const canvas = document.getElementById('radar-chart'); if (!canvas) return; const { ctx, w, h } = canvasSetup(canvas); const labels = Object.keys(state.radar), vals = Object.values(state.radar); const cx = w / 2, cy = h / 2 + 4, radius = Math.min(w, h) * .32, n = labels.length; ctx.clearRect(0, 0, w, h); ctx.strokeStyle = 'rgba(88,119,170,.16)'; ctx.lineWidth = 1;
+  const canvas = document.getElementById('radar-chart'); if (!canvas) return;
+  const { ctx, w, h } = canvasSetup(canvas);
+  const labels = PERFORMANCE_LABELS;
+  const current = performanceScores();
+  const vals = labels.map(k => current[k] || 0);
+  const goals = labels.map(k => Number(state.performanceGoals?.[k] ?? 70));
+  const cx = w / 2, cy = h / 2 + 4, radius = Math.min(w, h) * .32, n = labels.length;
+  ctx.clearRect(0, 0, w, h); ctx.strokeStyle = 'rgba(88,119,170,.16)'; ctx.lineWidth = 1;
   for (let level = 1; level <= 5; level++) { ctx.beginPath(); for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius * level / 5, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.closePath(); ctx.stroke(); }
   for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius); ctx.stroke(); }
-  ctx.beginPath(); vals.forEach((v, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius * v / 100, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius); g.addColorStop(0, 'rgba(31,214,255,.30)'); g.addColorStop(.65, 'rgba(47,123,255,.28)'); g.addColorStop(1, 'rgba(134,92,255,.24)'); ctx.fillStyle = g; ctx.fill(); ctx.shadowColor = '#20c8ff'; ctx.shadowBlur = 14; ctx.strokeStyle = '#23c7ff'; ctx.lineWidth = 2.2; ctx.stroke(); ctx.shadowBlur = 0;
-  vals.forEach((v, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius * v / 100, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fillStyle = i > 3 ? '#8b67ff' : '#29cfff'; ctx.fill(); }); ctx.fillStyle = '#dce7fa'; ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; labels.forEach((label, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n, r = radius + 24; ctx.fillText(label, cx + Math.cos(a) * r, cy + Math.sin(a) * r); });
+  const polygon = (values, stroke, fill, dash=[]) => { ctx.save(); ctx.beginPath(); values.forEach((v,i)=>{ const a=-Math.PI/2+i*2*Math.PI/n, r=radius*clamp(v)/100, x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.closePath(); ctx.setLineDash(dash); ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=2.2; ctx.shadowColor=stroke; ctx.shadowBlur=10; ctx.stroke(); ctx.restore(); };
+  polygon(goals, '#956fff', 'rgba(134,92,255,.08)', [6,4]);
+  polygon(vals, '#23c7ff', 'rgba(35,199,255,.20)');
+  vals.forEach((v, i) => { const a=-Math.PI/2+i*2*Math.PI/n, r=radius*v/100, x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r; ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fillStyle='#2fd7ff';ctx.fill(); });
+  goals.forEach((v, i) => { const a=-Math.PI/2+i*2*Math.PI/n, r=radius*v/100, x=cx+Math.cos(a)*r, y=cy+Math.sin(a)*r; ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fillStyle='#9a79ff';ctx.fill(); });
+  ctx.fillStyle = '#dce7fa'; ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  labels.forEach((label,i)=>{ const a=-Math.PI/2+i*2*Math.PI/n, r=radius+25; ctx.fillText(label, cx+Math.cos(a)*r, cy+Math.sin(a)*r); });
 }
 function last7Days() { return Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return localDateKey(d); }); }
 function drawBarChart(canvasId, labels, values, suffix = '') {
@@ -882,14 +1066,14 @@ function setupEvents() {
   document.getElementById('open-food-form').onclick = () => openFoodForm(); document.getElementById('open-scanner').onclick = openScanner; document.getElementById('meal-add-inline').onclick = () => openFoodForm(); document.getElementById('quick-meal').onclick = () => openFoodForm(); document.getElementById('quick-scan').onclick = openScanner;
   document.getElementById('quick-start').onclick = () => state.workouts[0] ? openSession(state.workouts[0].id) : openWorkoutWizard();
   document.getElementById('quick-recovery').onclick = () => openRecoveryForm(); document.getElementById('log-recovery').onclick = () => openRecoveryForm();
-  document.getElementById('add-habit').onclick = () => openHabitForm(); document.getElementById('edit-radar').onclick = editRadar;
+  document.getElementById('add-habit').onclick = () => openHabitForm(); document.getElementById('edit-radar').onclick = editRadar; document.getElementById('add-performance-test').onclick = openPerformanceTestForm; document.getElementById('edit-profile').onclick = () => openProfileForm(false);
   document.getElementById('home-score-card').onclick = openScoreDetails; document.getElementById('home-score-card').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') openScoreDetails(); };
   document.getElementById('export-data').onclick = exportData; document.getElementById('import-data').onchange = e => e.target.files[0] && importData(e.target.files[0]); document.getElementById('reset-data').onclick = resetData;
   document.getElementById('modal').addEventListener('close', stopCamera); window.addEventListener('resize', () => { if (document.getElementById('tracking-view').classList.contains('active')) drawAllCharts(); });
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstallPrompt = e; document.getElementById('install-btn').hidden = false; });
   document.getElementById('install-btn').onclick = async () => { if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; document.getElementById('install-btn').hidden = true; } else toast('Sur iPhone : Safari → Partager → Sur l’écran d’accueil'); };
 }
-function renderAll() { renderHome(); renderTraining(); renderNutrition(); renderTracking(); }
+function renderAll() { renderHome(); renderTraining(); renderNutrition(); renderTracking(); renderProfile(); }
 
-setupNavigation(); setupEvents(); renderAll();
+setupNavigation(); setupEvents(); renderAll(); maybePromptProfile();
 // Service worker temporairement désactivé pendant les tests iPhone pour éviter les anciennes versions en cache.

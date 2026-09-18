@@ -1,4 +1,4 @@
-const CACHE = 'arise-v13-reference-overlays-160';
+const CACHE = 'arise-v14-profile-scan-performance-170';
 const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./icons/icon-192-v3.png','./icons/icon-512-v3.png','./icons/apple-touch-icon-v3.png','./assets/anatomy-front.png','./assets/anatomy-back.png'];
 self.addEventListener('install', event => {
   self.skipWaiting();

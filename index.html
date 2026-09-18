@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon-v3.png" />
-  <link rel="stylesheet" href="styles.css?v=1.6.0" />
+  <link rel="stylesheet" href="styles.css?v=1.7.0" />
   <title>Arise</title>
 </head>
 <body>
@@ -44,7 +44,7 @@
       </button>
       <div class="top-actions">
         <button class="icon-btn notification-btn" aria-label="Notifications"><svg><use href="#i-bell"/></svg><i></i></button>
-        <button class="avatar-btn" id="open-settings" aria-label="Ouvrir les réglages"><span>AT</span></button>
+        <button class="avatar-btn" id="open-settings" aria-label="Ouvrir les réglages"><span id="top-avatar-initials">A</span></button>
         <button class="icon-btn install-icon" id="install-btn" hidden aria-label="Installer Arise">↓</button>
       </div>
     </header>
@@ -53,8 +53,8 @@
       <section class="view active" id="home-view" data-title="Accueil" data-kicker="TA MEILLEURE VERSION">
         <div class="welcome-row">
           <div>
-            <p class="eyebrow">BONJOUR, ARNAUD <span>👋</span></p>
-            <h1>Prêt à t’élever ?</h1>
+            <p class="eyebrow">BONJOUR, <span id="home-first-name">UTILISATEUR</span> <span>👋</span></p>
+            <h1>Ton résumé de la journée :</h1>
           </div>
           <div class="day-chip"><span id="home-day">AUJ.</span><b id="home-date">03</b></div>
         </div>
@@ -87,16 +87,11 @@
           <button class="quick-action" id="quick-meal"><span class="quick-icon violet"><svg><use href="#i-food"/></svg></span><b>Ajouter</b><small>un repas</small></button>
           <button class="quick-action" id="quick-recovery"><span class="quick-icon pink"><svg><use href="#i-moon"/></svg></span><b>Noter</b><small>mon repos</small></button>
         </div>
-
-        <article class="quote-card">
-          <div><small>CITATION DU JOUR</small><p>« La discipline d’aujourd’hui libère ta puissance de demain. »</p></div>
-          <span class="mini-logo"><i></i><i></i></span>
-        </article>
-      </section>
+</section>
 
       <section class="view" id="training-view" data-title="Entraînement" data-kicker="PERFORME PLUS FORT">
         <div class="page-heading">
-          <div><p class="eyebrow">ENTRAÎNEMENT</p><h1>Dépasse tes limites.</h1></div>
+          <div><p class="eyebrow">ENTRAÎNEMENT</p><h1>Choisis le training que tu veux :</h1></div>
           <button class="round-control"><svg><use href="#i-settings"/></svg></button>
         </div>
 
@@ -136,7 +131,7 @@
       </section>
 
       <section class="view" id="nutrition-view" data-title="Alimentation" data-kicker="NOURRIS TON POTENTIEL">
-        <div class="page-heading"><div><p class="eyebrow">ALIMENTATION</p><h1>Choisis mieux. Simplement.</h1></div><span class="macro-orb">N</span></div>
+        <div class="page-heading"><div><p class="eyebrow">ALIMENTATION</p><h1>Scan directement ce que tu manges :</h1></div><span class="macro-orb">N</span></div>
 
         <div class="scanner-panel">
           <div class="scan-frame"><i></i><i></i><i></i><i></i><div class="camera-symbol"><svg><use href="#i-scan"/></svg></div><span>Analyse instantanée</span></div>
@@ -156,12 +151,15 @@
       </section>
 
       <section class="view" id="tracking-view" data-title="Tracking" data-kicker="ANALYSE ET PROGRESSE">
-        <div class="page-heading"><div><p class="eyebrow">TRACKING</p><h1>Transforme tes données.</h1></div><div class="tracking-live"><i></i> LIVE</div></div>
+        <div class="page-heading"><div><p class="eyebrow">TRACKING</p><h1>Visualise tes données :</h1></div><div class="tracking-live"><i></i> LIVE</div></div>
 
         <div class="card chart-card radar-card">
-          <div class="section-head compact"><div><small>PROFIL DE PERFORMANCE</small><h2>Ton équilibre sportif</h2></div><button class="text-btn" id="edit-radar">Modifier</button></div>
+          <div class="section-head compact"><div><small>PROFIL DE PERFORMANCE</small><h2>Niveau actuel vs objectifs</h2></div><div class="inline-actions"><button class="text-btn" id="add-performance-test"><svg><use href="#i-plus"/></svg> Test</button><button class="text-btn" id="edit-radar">Objectifs</button></div></div>
           <canvas id="radar-chart" width="340" height="310" aria-label="Diagramme radar"></canvas>
-          <div class="chart-legend"><span><i class="legend-you"></i> Toi</span><span><i class="legend-average"></i> Objectif</span></div>
+          <div class="chart-legend"><span><i class="legend-you"></i> Niveau estimé</span><span><i class="legend-average"></i> Objectif</span></div>
+          <div id="performance-summary" class="performance-summary"></div>
+          <p class="radar-note">Score comparatif estimé à partir de tes performances récentes et de tes tests. Ce n’est pas un classement mondial officiel.</p>
+          <div id="performance-tests" class="performance-tests"></div>
         </div>
 
         <div class="card chart-card">
@@ -183,16 +181,16 @@
 
       <section class="view" id="settings-view" data-title="Profil" data-kicker="TES DONNÉES, TES RÈGLES">
         <div class="profile-card">
-          <div class="profile-avatar">AT</div><div><small>PROFIL ARISE</small><h1>Arnaud</h1><p>Construire. Mesurer. Progresser.</p></div>
+          <div class="profile-avatar" id="profile-avatar">A</div><div class="profile-main"><small>PROFIL ARISE</small><h1 id="profile-name">Mon profil</h1><p id="profile-meta">Configure ton profil pour personnaliser Arise.</p></div><button class="icon-action" id="edit-profile" aria-label="Modifier le profil"><svg><use href="#i-edit"/></svg></button>
         </div>
-        <div class="security-card"><span>◆</span><div><h2>Confidentialité locale</h2><p>Tes données restent stockées sur cet appareil.</p></div></div>
+        <div class="security-card"><span>◆</span><div><h2>Confidentialité locale</h2><p>Ton profil, tes repas, tes entraînements et tes habitudes restent stockés sur cet appareil.</p></div></div>
         <div class="section-head"><h2>Données & sécurité</h2></div>
         <div class="card settings-list">
           <button id="export-data"><span><b>Exporter mes données</b><small>Créer une sauvegarde JSON</small></span><svg><use href="#i-chevron"/></svg></button>
           <label class="file-button"><span><b>Importer une sauvegarde</b><small>Restaurer tes données locales</small></span><svg><use href="#i-chevron"/></svg><input type="file" id="import-data" accept="application/json" hidden /></label>
           <button id="reset-data" class="danger-row"><span><b>Effacer toutes mes données</b><small>Action irréversible</small></span><svg><use href="#i-chevron"/></svg></button>
         </div>
-        <div class="card info-card"><span class="version-pill">ARISE BETA 1.5.4</span><h3>Application privée de test</h3><p>Pas de compte, pas de publicité et pas de suivi analytique. Les analyses nutritionnelles restent indicatives.</p></div>
+        <div class="card info-card"><span class="version-pill">ARISE BETA 1.7.0</span><h3>Application privée de test</h3><p>Un profil local indépendant est créé sur chaque téléphone. Pas de publicité ni de suivi analytique. Les analyses nutritionnelles et scores sportifs restent indicatifs.</p></div>
       </section>
     </main>
 
@@ -240,6 +238,6 @@
       window.ariseFallbackNavigate = activateFromHash;
     })();
   </script>
-  <script src="app.js?v=1.6.0"></script>
+  <script src="app.js?v=1.7.0"></script>
 </body>
 </html>

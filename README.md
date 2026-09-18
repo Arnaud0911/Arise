@@ -42,3 +42,12 @@ Après publication sur un hébergement HTTPS :
 - Le numéro du code-barres est envoyé à Open Food Facts lors d'une analyse produit.
 - Le flux caméra n'est pas enregistré par Arise.
 - Les analyses nutritionnelles sont indicatives et ne remplacent pas un avis médical.
+
+
+## Arise 1.7
+- Profil local indépendant par téléphone (prénom, poids, taille et référence sportive).
+- Scan live de codes-barres avec caméra + Open Food Facts, quantité puis ajout automatique aux apports du jour.
+- Radar de performance calculé automatiquement à partir des séances et tests récents, avec objectifs superposés.
+- Tests possibles : développé couché, squat, soulevé de terre, 100 m, 5 km, marathon, saut vertical et sit & reach.
+
+Le scan caméra nécessite GitHub Pages/HTTPS, l'autorisation caméra et une connexion Internet pour identifier le produit.
